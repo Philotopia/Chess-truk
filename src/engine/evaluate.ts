@@ -184,6 +184,8 @@ const kUnits = new Int32Array(2);
 const CENTER = [0x33, 0x34, 0x43, 0x44];
 
 let trace: EvalTraceEntry[] | null = null;
+/** Trace aussi les contributions nulles (extraction de caractéristiques pour le réglage). */
+let traceAll = false;
 
 function add(term: number, color: Color, mg: number, eg: number, sq: number, key: string, n?: number): void {
   if (color === WHITE) {
@@ -193,7 +195,7 @@ function add(term: number, color: Color, mg: number, eg: number, sq: number, key
     accMg[term] -= mg;
     accEg[term] -= eg;
   }
-  if (trace !== null && (mg !== 0 || eg !== 0)) {
+  if (trace !== null && (mg !== 0 || eg !== 0 || traceAll)) {
     trace.push({ term: EVAL_TERMS[term], color, sq, key, mg, eg, n });
   }
 }
@@ -244,7 +246,7 @@ function run(pos: Position, params: EvalParams): number {
     if (on[T_PSQT]) {
       const mg = C.pstMg[p * 128 + sq];
       const eg = C.pstEg[p * 128 + sq];
-      if (mg !== 0 || eg !== 0) add(T_PSQT, c, mg, eg, sq, 'pst');
+      if (mg !== 0 || eg !== 0 || traceAll) add(T_PSQT, c, mg, eg, sq, 'pst');
     }
     if (t === PAWN) {
       const f = sq & 7;
@@ -308,7 +310,7 @@ function run(pos: Position, params: EvalParams): number {
     const rel = c === WHITE ? r : 7 - r;
     if (doAdv) {
       const v = C.adv[c * 8 + r];
-      if (v) add(T_PAWN_ADVANCEMENT, c, v, v, sq, 'advance', rel + 1);
+      if (v || traceAll) add(T_PAWN_ADVANCEMENT, c, v, v, sq, 'advance', rel + 1);
     }
     // Pion ami devant sur la même colonne ?
     const ownAhead = c === WHITE ? maxRank[c][f] > r : minRank[c][f] < r;
@@ -362,7 +364,7 @@ function run(pos: Position, params: EvalParams): number {
           const dOwn = Math.min(5, dist(pos.kingSq[c], stop));
           const dThem = Math.min(5, dist(pos.kingSq[them], stop));
           const v = P.kingPasserProximity * (dThem - dOwn);
-          if (v) add(T_KING_ENDGAME, c, 0, v, sq, 'kingProximity', dThem - dOwn);
+          if (v || (traceAll && dThem !== dOwn)) add(T_KING_ENDGAME, c, 0, v, sq, 'kingProximity', dThem - dOwn);
         }
       }
     }
@@ -491,7 +493,7 @@ function run(pos: Position, params: EvalParams): number {
     }
   }
 
-  if (on[T_SPACE] && P.space !== 0) {
+  if (on[T_SPACE] && (P.space !== 0 || traceAll)) {
     for (let c = 0 as Color; c < 2; c = (c + 1) as Color) {
       const them = c ^ 1;
       const ownPawn = PAWN | (c << 3);
@@ -546,13 +548,13 @@ function run(pos: Position, params: EvalParams): number {
         }
       }
       const shield = n1 * ks.shieldRank1 + n2 * ks.shieldRank2;
-      if (shield) add(T_KING_SAFETY, c, shield, 0, k, 'shield', n1 * 16 + n2);
+      if (shield || (traceAll && n1 + n2 > 0)) add(T_KING_SAFETY, c, shield, 0, k, 'shield', n1 * 16 + n2);
       if (open) add(T_KING_SAFETY, c, open * ks.openFile, 0, k, 'openFile', open);
       if (semi) add(T_KING_SAFETY, c, semi * ks.semiOpenFile, 0, k, 'semiOpenFile', semi);
       if (kAttackers[c] >= ks.minAttackers && kUnits[c] > 0) {
         const u = kUnits[c];
         const pen = Math.min(ks.attackCap, Math.round((u * u * ks.attackScale) / 100));
-        if (pen) add(T_KING_SAFETY, c, -pen, 0, k, 'kingPressure', kAttackers[c] * 1000 + u);
+        if (pen || traceAll) add(T_KING_SAFETY, c, -pen, 0, k, 'kingPressure', kAttackers[c] * 1000 + u);
       }
     }
   }
@@ -562,7 +564,7 @@ function run(pos: Position, params: EvalParams): number {
     if (pos.counts[BISHOP | 8] >= 2) add(T_BISHOP_PAIR, BLACK, P.bishopPair.mg, P.bishopPair.eg, -1, 'pair');
   }
 
-  if (on[T_DEVELOPMENT] && P.development.undevelopedMinor !== 0) {
+  if (on[T_DEVELOPMENT] && (P.development.undevelopedMinor !== 0 || traceAll)) {
     const u = P.development.undevelopedMinor;
     if (b[0x01] === KNIGHT) add(T_DEVELOPMENT, WHITE, u, 0, 0x01, 'undeveloped');
     if (b[0x06] === KNIGHT) add(T_DEVELOPMENT, WHITE, u, 0, 0x06, 'undeveloped');
@@ -627,15 +629,17 @@ export function evaluateStm(pos: Position, params: EvalParams): number {
   return pos.side === WHITE ? v : -v;
 }
 
-/** Évaluation détaillée : composantes et contributions élémentaires. */
-export function evaluateDetailed(pos: Position, params: EvalParams): EvalBreakdown {
+/** Évaluation détaillée : composantes et contributions élémentaires (allTerms : inclure les contributions nulles). */
+export function evaluateDetailed(pos: Position, params: EvalParams, allTerms = false): EvalBreakdown {
   const entries: EvalTraceEntry[] = [];
   trace = entries;
+  traceAll = allTerms;
   let exact: number;
   try {
     exact = run(pos, params);
   } finally {
     trace = null;
+    traceAll = false;
   }
   const phase = gamePhase(pos);
   const terms = {} as Record<EvalTerm, EvalTermResult>;

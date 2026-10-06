@@ -53,7 +53,7 @@ describe('évaluation', () => {
       if (t === 'tempo') continue;
       expect(d.terms[t].value, t).toBe(0);
     }
-    expect(d.total).toBe(10); // tempo MG = 10, phase 24
+    expect(d.total).toBe(params.tempo.mg); // seul le trait compte (phase 24 = 100 % MG)
   });
 
   it('symétrie couleur : eval(miroir) = −eval', () => {

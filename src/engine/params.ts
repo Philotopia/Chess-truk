@@ -236,7 +236,81 @@ const KING_EG_PST = [
   -50, -30, -30, -30, -30, -30, -30, -50,
 ];
 
+/**
+ * Valeurs V2 : coefficients scalaires réglés par la méthode Texel (self-play Truk, 250 000 positions,
+ * contraintes de signe, avancement des pions figé), validés par SPRT : +42 Elo [+20 ; +65].
+ * Les tables pièce-case restent celles de la V1.
+ */
+export const TEXEL_V2_OVERRIDES: [string, number][] = [
+  ['pieceValues.knight', 308],
+  ['pieceValues.bishop', 341],
+  ['pieceValues.rook', 505],
+  ['pieceValues.queen', 924],
+  ['passedPawn.mg.1', 9],
+  ['passedPawn.mg.2', 9],
+  ['passedPawn.mg.3', 9],
+  ['passedPawn.mg.4', 11],
+  ['passedPawn.mg.5', 23],
+  ['passedPawn.mg.6', 41],
+  ['passedPawn.eg.1', 30],
+  ['passedPawn.eg.2', 30],
+  ['passedPawn.eg.3', 39],
+  ['passedPawn.eg.4', 57],
+  ['passedPawn.eg.5', 71],
+  ['passedPawn.eg.6', 71],
+  ['protectedPassed.mg', 0],
+  ['protectedPassed.eg', 9],
+  ['connectedPawn.mg', 5],
+  ['connectedPawn.eg', 2],
+  ['isolatedPawn.mg', -6],
+  ['isolatedPawn.eg', 0],
+  ['doubledPawn.eg', -32],
+  ['backwardPawn.mg', -18],
+  ['backwardPawn.eg', -8],
+  ['kingPasserProximity', 23],
+  ['mobility.knight.eg', 0],
+  ['mobility.bishop.mg', 5],
+  ['mobility.bishop.eg', 2],
+  ['mobility.rook.mg', 6],
+  ['mobility.rook.eg', 0],
+  ['mobility.queen.eg', 7],
+  ['center.pawnOccupation', 0],
+  ['center.attack', 2],
+  ['space', 0],
+  ['kingSafety.shieldRank1', 15],
+  ['kingSafety.shieldRank2', 0],
+  ['kingSafety.semiOpenFile', 0],
+  ['kingSafety.openFile', -29],
+  ['kingSafety.attackScale', 34],
+  ['bishopPair.mg', 37],
+  ['bishopPair.eg', 56],
+  ['rookOpenFile.mg', 43],
+  ['rookOpenFile.eg', 17],
+  ['rookSemiOpenFile.mg', 23],
+  ['rookSemiOpenFile.eg', 2],
+  ['rookOnSeventh.mg', 23],
+  ['rookOnSeventh.eg', 38],
+  ['outpost.knight.mg', 19],
+  ['outpost.knight.eg', 0],
+  ['outpost.bishop.mg', 15],
+  ['outpost.bishop.eg', 22],
+  ['development.undevelopedMinor', 0],
+  ['threats.attackedByPawn.mg', -39],
+  ['threats.attackedByPawn.eg', -18],
+  ['threats.hanging.mg', -18],
+  ['threats.hanging.eg', -13],
+  ['tempo.mg', 11],
+  ['tempo.eg', 0],
+];
+
 export function defaultEvalParams(): EvalParams {
+  const p = v1EvalParams();
+  for (const [path, v] of TEXEL_V2_OVERRIDES) setByPath(p, path, v);
+  return p;
+}
+
+/** Valeurs de la V1 (réglées à la main). */
+export function v1EvalParams(): EvalParams {
   const enabled = {} as Record<EvalTerm, boolean>;
   for (const t of EVAL_TERMS) enabled[t] = true;
   return {
@@ -333,7 +407,7 @@ export function v1SearchOptions(): SearchOptions {
   };
 }
 
-export function defaultEngineConfig(name = 'Truk v1'): EngineConfig {
+export function defaultEngineConfig(name = 'Truk V2'): EngineConfig {
   return { formatVersion: 1, name, eval: defaultEvalParams(), search: defaultSearchOptions() };
 }
 

@@ -633,6 +633,19 @@ export class Searcher {
     return bestScore;
   }
 
+  /** Variante de quiescence depuis `pos` (coups UCI internes) : sert à obtenir une position calme (réglage Texel). */
+  quiescencePv(pos: Position): number[] {
+    this.pos = pos;
+    this.nodes = 0;
+    this.stopped = false;
+    this.canStop = false;
+    this.seldepth = 0;
+    this.qsearch(-INF, INF, 0);
+    const pv: number[] = [];
+    for (let j = 0; j < this.pvLength[0]; j++) pv.push(this.pvTable[j]);
+    return pv;
+  }
+
   /** Feuille sans quiescence : évaluation statique, mais détection des mats et pats. */
   private leafEval(ply: number): number {
     this.nodes++;

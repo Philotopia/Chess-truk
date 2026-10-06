@@ -33,12 +33,10 @@ function buildSpec(): TuneParam[] {
     for (const ph of ['mg', 'eg']) for (let i = 0; i < 64; i++) add(`psqt.${p}.${ph}.${i}`, -200, 200);
   }
   for (const ph of ['mg', 'eg']) for (let r = 1; r <= 6; r++) add(`passedPawn.${ph}.${r}`, 0, 300);
-  const s2 = [
+  // Contraintes de signe : un bonus reste ≥ 0, un malus reste ≤ 0 (le sens de chaque composante est conservé).
+  const BONUS: string[] = [
     'protectedPassed',
     'connectedPawn',
-    'isolatedPawn',
-    'doubledPawn',
-    'backwardPawn',
     'mobility.knight',
     'mobility.bishop',
     'mobility.rook',
@@ -49,26 +47,16 @@ function buildSpec(): TuneParam[] {
     'rookOnSeventh',
     'outpost.knight',
     'outpost.bishop',
-    'threats.attackedByPawn',
-    'threats.hanging',
     'tempo',
   ];
-  for (const k of s2) for (const ph of ['mg', 'eg']) add(`${k}.${ph}`, -150, 150);
-  for (const k of [
-    'kingPasserProximity',
-    'center.pawnOccupation',
-    'center.attack',
-    'space',
-    'kingSafety.shieldRank1',
-    'kingSafety.shieldRank2',
-    'kingSafety.semiOpenFile',
-    'kingSafety.openFile',
-    'development.undevelopedMinor',
-    'mopUp.edge',
-    'mopUp.proximity',
-  ])
-    add(k, -100, 100);
+  const MALUS: string[] = ['isolatedPawn', 'doubledPawn', 'backwardPawn', 'threats.attackedByPawn', 'threats.hanging'];
+  for (const k of BONUS) for (const ph of ['mg', 'eg']) add(`${k}.${ph}`, 0, 200);
+  for (const k of MALUS) for (const ph of ['mg', 'eg']) add(`${k}.${ph}`, -200, 0);
+  for (const k of ['kingPasserProximity', 'center.pawnOccupation', 'center.attack', 'space', 'kingSafety.shieldRank1', 'kingSafety.shieldRank2'])
+    add(k, 0, 100);
+  for (const k of ['kingSafety.semiOpenFile', 'kingSafety.openFile', 'development.undevelopedMinor']) add(k, -100, 0);
   add('kingSafety.attackScale', 0, 300);
+  // « Finale gagnante » (mopUp) : connaissance de conversion, figée (trop rare dans les données pour être estimée).
   return out;
 }
 
@@ -120,7 +108,7 @@ export interface Features {
  * eval ≈ Σ v[idx]·(mg·phase + eg·(24−phase))/24 + constant (point de vue des blancs).
  */
 export function extractFeatures(pos: Position, params: EvalParams): Features {
-  const d = evaluateDetailed(pos, params);
+  const d = evaluateDetailed(pos, params, true);
   const ph = d.phase;
   const acc = new Map<number, [number, number]>();
   let constant = 0;
@@ -239,12 +227,6 @@ export function extractFeatures(pos: Position, params: EvalParams): Features {
         push('tempo.mg', sg, 0);
         push('tempo.eg', 0, sg);
         break;
-      case 'mopUpEdge':
-        push('mopUp.edge', 0, sg * n);
-        break;
-      case 'mopUpKings':
-        push('mopUp.proximity', 0, sg * n);
-        break;
       default:
         constant += sg * interp(e.mg, e.eg);
     }
@@ -312,6 +294,10 @@ export function adamEpoch(
   state: { m: Float64Array; s: Float64Array; t: number },
   lr = 1,
   batch = 4096,
+  /** 1 = paramètre figé (non mis à jour). */
+  frozen?: Uint8Array,
+  /** Régularisation L2 vers les valeurs de départ v0 (erreur += λ·Σ((v−v0)/100)²). */
+  reg?: { lambda: number; v0: Float64Array },
 ): void {
   const n = v.length;
   const grad = new Float64Array(n);
@@ -332,7 +318,9 @@ export function adamEpoch(
     const b1 = 0.9;
     const b2 = 0.999;
     for (let j = 0; j < n; j++) {
-      const gj = grad[j] / m;
+      if (frozen && frozen[j]) continue;
+      let gj = grad[j] / m;
+      if (reg) gj += (2 * reg.lambda * (v[j] - reg.v0[j])) / 10000;
       state.m[j] = b1 * state.m[j] + (1 - b1) * gj;
       state.s[j] = b2 * state.s[j] + (1 - b2) * gj * gj;
       const mh = state.m[j] / (1 - Math.pow(b1, state.t));
