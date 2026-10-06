@@ -85,6 +85,7 @@ const OPT_LABELS: [keyof SearchOptions, string, string][] = [
   ['qsTT', 'TT en quiescence (V2)', 'La table de transposition sert aussi dans la quiescence.'],
   ['iir', 'Internal iterative reduction (V2)', 'Sans coup en table : profondeur − 1.'],
   ['countermove', 'Contre-coup (V2)', 'Coup ayant réfuté le coup adverse précédent, essayé tôt.'],
+  ['singular', 'Extension singulière (V2)', 'Le coup de table est prolongé s’il est nettement meilleur que tous les autres.'],
 ];
 
 export function SearchOptionsEditor({ opts, onChange }: { opts: SearchOptions; onChange: (o: SearchOptions) => void }) {

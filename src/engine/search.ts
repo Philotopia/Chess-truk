@@ -434,7 +434,7 @@ export class Searcher {
     }
   }
 
-  private negamax(depth: number, alpha: number, beta: number, ply: number, allowNull: boolean): number {
+  private negamax(depth: number, alpha: number, beta: number, ply: number, allowNull: boolean, excluded = 0): number {
     const pos = this.pos;
     const o = this.opts;
     this.pvLength[ply] = ply;
@@ -464,8 +464,14 @@ export class Searcher {
 
     const isPv = beta - alpha > 1;
     let ttMove = 0;
-    if (o.useTT && this.tt.probe(pos.hashLo, pos.hashHi)) {
+    let ttScore = 0;
+    let ttDepth = -1;
+    let ttFlag = 0;
+    if (o.useTT && excluded === 0 && this.tt.probe(pos.hashLo, pos.hashHi)) {
       ttMove = this.tt.hitMove;
+      ttScore = scoreFromTT(this.tt.hitScore, ply);
+      ttDepth = this.tt.hitDepth;
+      ttFlag = this.tt.hitFlag;
       if (!isPv && this.tt.hitDepth >= depth) {
         const s = scoreFromTT(this.tt.hitScore, ply);
         const f = this.tt.hitFlag;
@@ -479,7 +485,7 @@ export class Searcher {
     this.evalStack[ply] = inCheck ? -INF : staticEval;
     const improving = !inCheck && ply >= 2 && this.evalStack[ply - 2] !== -INF && staticEval > this.evalStack[ply - 2];
 
-    if (!isPv && !inCheck && !isRoot) {
+    if (!isPv && !inCheck && !isRoot && excluded === 0) {
       // Reverse futility pruning.
       if (o.rfp && depth <= 7 && Math.abs(beta) < MATE_BOUND && staticEval - RFP_MARGIN * (depth - (improving ? 1 : 0)) >= beta) {
         return staticEval;
@@ -502,7 +508,28 @@ export class Searcher {
     }
 
     // Internal iterative reduction : sans coup de table, on réduit (la branche est probablement peu importante).
-    if (o.iir && depth >= 4 && ttMove === 0 && !inCheck) depth--;
+    if (o.iir && depth >= 4 && ttMove === 0 && !inCheck && excluded === 0) depth--;
+
+    // Extension singulière : si aucun autre coup n'approche le score du coup de table, ce coup est prolongé.
+    // (Recherche réduite faite AVANT la génération des coups de ce nœud, qui partage le même tampon.)
+    let singularExt = 0;
+    if (
+      o.singular &&
+      !isRoot &&
+      excluded === 0 &&
+      depth >= 7 &&
+      ttMove !== 0 &&
+      (ttFlag === TT_LOWER || ttFlag === TT_EXACT) &&
+      ttDepth >= depth - 3 &&
+      Math.abs(ttScore) < MATE_BOUND
+    ) {
+      const sBeta = ttScore - 2 * depth;
+      const v = this.negamax((depth - 1) >> 1, sBeta - 1, sBeta, ply, false, ttMove);
+      this.pvLength[ply] = ply;
+      if (this.stopped) return 0;
+      if (v < sBeta) singularExt = 1;
+      else if (sBeta >= beta) return sBeta; // multi-cut : plusieurs coups dépassent bêta
+    }
 
     const start = ply * MOVE_STRIDE;
     const end = pos.generateMoves(this.moves, start);
@@ -520,6 +547,7 @@ export class Searcher {
     const qBase = ply * 64;
     for (let i = start; i < end; i++) {
       const m = this.pickMove(i, end);
+      if (m === excluded) continue;
       const isCap = (moveFlags(m) & FLAG_CAPTURE) !== 0;
       const quiet = !isCap && movePromo(m) === 0;
       const isKiller = m === this.killers[ply * 2] || m === this.killers[ply * 2 + 1];
@@ -544,7 +572,7 @@ export class Searcher {
       if (quiet) quietCount++;
 
       let score: number;
-      const newDepth = depth - 1;
+      const newDepth = depth - 1 + (m === ttMove ? singularExt : 0);
       if (legal === 1) {
         score = -this.negamax(newDepth, -beta, -alpha, ply + 1, true);
       } else {
@@ -624,9 +652,9 @@ export class Searcher {
     }
 
     // Les élagages exigent au moins un coup légal déjà cherché : legal = 0 signifie mat ou pat.
-    if (legal === 0) return inCheck ? -MATE + ply : 0;
+    if (legal === 0) return excluded !== 0 ? alpha : inCheck ? -MATE + ply : 0;
 
-    if (o.useTT) {
+    if (o.useTT && excluded === 0) {
       const flag = bestScore >= beta ? TT_LOWER : bestScore > origAlpha ? TT_EXACT : TT_UPPER;
       this.tt.store(pos.hashLo, pos.hashHi, depth, flag, scoreToTT(bestScore, ply), bestMove);
     }

@@ -4,10 +4,10 @@
   "eval": {
     "pieceValues": {
       "pawn": 100,
-      "knight": 308,
-      "bishop": 341,
-      "rook": 505,
-      "queen": 924
+      "knight": 317,
+      "bishop": 343,
+      "rook": 521,
+      "queen": 946
     },
     "psqt": {
       "pawn": {
@@ -828,62 +828,62 @@
     "passedPawn": {
       "mg": [
         0,
-        9,
-        9,
-        9,
-        11,
-        23,
-        41,
+        0,
+        0,
+        0,
+        15,
+        31,
+        39,
         0
       ],
       "eg": [
         0,
-        30,
-        30,
-        39,
-        57,
-        71,
-        71,
+        26,
+        26,
+        41,
+        67,
+        88,
+        88,
         0
       ]
     },
     "protectedPassed": {
       "mg": 0,
-      "eg": 9
+      "eg": 10
     },
     "connectedPawn": {
-      "mg": 5,
-      "eg": 2
+      "mg": 7,
+      "eg": 5
     },
     "isolatedPawn": {
-      "mg": -6,
-      "eg": 0
+      "mg": -2,
+      "eg": -2
     },
     "doubledPawn": {
-      "mg": -10,
-      "eg": -32
+      "mg": -26,
+      "eg": -26
     },
     "backwardPawn": {
-      "mg": -18,
-      "eg": -8
+      "mg": -11,
+      "eg": -9
     },
-    "kingPasserProximity": 23,
+    "kingPasserProximity": 32,
     "mobility": {
       "knight": {
-        "mg": 4,
+        "mg": 5,
         "eg": 0
       },
       "bishop": {
         "mg": 5,
-        "eg": 2
+        "eg": 1
       },
       "rook": {
-        "mg": 6,
-        "eg": 0
+        "mg": 3,
+        "eg": 5
       },
       "queen": {
-        "mg": 1,
-        "eg": 7
+        "mg": 2,
+        "eg": 3
       },
       "baseline": {
         "knight": 4,
@@ -894,48 +894,48 @@
     },
     "center": {
       "pawnOccupation": 0,
-      "attack": 2
+      "attack": 0
     },
     "space": 0,
     "kingSafety": {
-      "shieldRank1": 15,
-      "shieldRank2": 0,
+      "shieldRank1": 16,
+      "shieldRank2": 2,
       "semiOpenFile": 0,
-      "openFile": -29,
+      "openFile": -39,
       "attackWeights": {
         "knight": 2,
         "bishop": 2,
         "rook": 3,
         "queen": 5
       },
-      "attackScale": 34,
+      "attackScale": 38,
       "attackCap": 500,
       "minAttackers": 2
     },
     "bishopPair": {
       "mg": 37,
-      "eg": 56
+      "eg": 55
     },
     "rookOpenFile": {
-      "mg": 43,
-      "eg": 17
+      "mg": 50,
+      "eg": 15
     },
     "rookSemiOpenFile": {
-      "mg": 23,
-      "eg": 2
+      "mg": 33,
+      "eg": 16
     },
     "rookOnSeventh": {
-      "mg": 23,
-      "eg": 38
+      "mg": 22,
+      "eg": 34
     },
     "outpost": {
       "knight": {
-        "mg": 19,
-        "eg": 0
+        "mg": 30,
+        "eg": 3
       },
       "bishop": {
-        "mg": 15,
-        "eg": 22
+        "mg": 16,
+        "eg": 25
       }
     },
     "development": {
@@ -943,12 +943,12 @@
     },
     "threats": {
       "attackedByPawn": {
-        "mg": -39,
+        "mg": -44,
         "eg": -18
       },
       "hanging": {
-        "mg": -18,
-        "eg": -13
+        "mg": -22,
+        "eg": -15
       }
     },
     "tempo": {
@@ -1002,6 +1002,7 @@
     "see": true,
     "qsTT": true,
     "iir": true,
-    "countermove": true
+    "countermove": true,
+    "singular": false
   }
 }
