@@ -122,15 +122,23 @@ export function computeStats(games: GameRecord[]): MatchStats {
   if (n > 0) {
     // Variance par partie du modèle trinomial V/N/D.
     const variance = (w * (1 - score) ** 2 + d * (0.5 - score) ** 2 + l * (0 - score) ** 2) / n;
-    const se = Math.sqrt(variance / n);
-    scoreLow = Math.max(0, score - 1.96 * se);
-    scoreHigh = Math.min(1, score + 1.96 * se);
-    if (score > 0 && score < 1) {
-      elo = eloFromScore(score);
-      const clamp = (x: number) => Math.min(0.9999, Math.max(0.0001, x));
-      eloLow = eloFromScore(clamp(scoreLow));
-      eloHigh = eloFromScore(clamp(scoreHigh));
+    const z = 1.96;
+    if (variance > 0) {
+      const se = Math.sqrt(variance / n);
+      scoreLow = Math.max(0, score - z * se);
+      scoreHigh = Math.min(1, score + z * se);
+    } else {
+      // Résultats tous identiques : intervalle de Wilson (l'approximation normale serait dégénérée).
+      const den = 1 + (z * z) / n;
+      const center = (score + (z * z) / (2 * n)) / den;
+      const half = (z * Math.sqrt((score * (1 - score)) / n + (z * z) / (4 * n * n))) / den;
+      scoreLow = Math.max(0, center - half);
+      scoreHigh = Math.min(1, center + half);
     }
+    const clamp = (x: number) => Math.min(0.9999, Math.max(0.0001, x));
+    if (score > 0 && score < 1) elo = eloFromScore(score);
+    eloLow = eloFromScore(clamp(scoreLow));
+    eloHigh = eloFromScore(clamp(scoreHigh));
     if (w + l > 0) los = 0.5 * (1 + erf((w - l) / Math.sqrt(2 * (w + l))));
   }
   const avgPlies = done.length ? done.reduce((s, g) => s + g.moves.length, 0) / done.length : 0;

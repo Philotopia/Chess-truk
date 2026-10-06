@@ -158,7 +158,7 @@ export class UciEngine {
         if (o) this.options.push(o);
       } else if (l.startsWith('info ')) {
         const info = parseInfoLine(l);
-        if (info && info.multipv === 1 && info.pv.length) {
+        if (info && info.multipv === 1 && (info.pv.length || !this.lastInfo)) {
           this.lastInfo = info;
           this.infoCb?.(info);
         }
