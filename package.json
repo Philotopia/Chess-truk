@@ -14,7 +14,8 @@
     "test:watch": "vitest",
     "perft": "tsx scripts/perft.ts",
     "bench": "tsx scripts/bench.ts",
-    "match": "tsx scripts/match.ts"
+    "match": "tsx scripts/match.ts",
+    "e2e": "node tests/e2e/smoke.cjs"
   },
   "dependencies": {
     "react": "^19.3.0",
