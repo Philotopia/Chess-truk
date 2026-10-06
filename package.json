@@ -15,7 +15,10 @@
     "perft": "tsx scripts/perft.ts",
     "bench": "tsx scripts/bench.ts",
     "match": "tsx scripts/match.ts",
-    "e2e": "node tests/e2e/smoke.cjs"
+    "e2e": "node tests/e2e/smoke.cjs",
+    "texel-gen": "tsx scripts/texel-gen.ts",
+    "texel-tune": "tsx scripts/texel-tune.ts",
+    "gen-openings": "tsx scripts/gen-openings.ts"
   },
   "dependencies": {
     "react": "^19.3.0",

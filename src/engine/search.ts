@@ -119,6 +119,15 @@ export class Searcher {
   private counter = new Int32Array(16 * 128);
   private evalStack = new Int32Array(MAX_PLY + 2);
   private quietsTried = new Int32Array(MAX_PLY * 64);
+  // Cache d'évaluation statique (clé 64 bits) : évite de réévaluer les positions revues d'une itération à l'autre.
+  private static readonly EVAL_CACHE_BITS = 18;
+  private evalKeyLo = new Int32Array(1 << Searcher.EVAL_CACHE_BITS);
+  private evalKeyHi = new Int32Array(1 << Searcher.EVAL_CACHE_BITS);
+  private evalVal = new Int32Array(1 << Searcher.EVAL_CACHE_BITS);
+  private evalUsed = new Uint8Array(1 << Searcher.EVAL_CACHE_BITS);
+  private evalParamsRef: EvalParams | null = null;
+  evalHits = 0;
+  evalCalls = 0;
 
   private pos!: Position;
   private nodes = 0;
@@ -146,6 +155,28 @@ export class Searcher {
     this.history.fill(0);
     this.killers.fill(0);
     this.counter.fill(0);
+    this.evalUsed.fill(0);
+  }
+
+  /** Évaluation statique (camp au trait), via le cache. */
+  private evalStm(): number {
+    const pos = this.pos;
+    if (this.evalParamsRef !== this.params) {
+      this.evalUsed.fill(0);
+      this.evalParamsRef = this.params;
+    }
+    this.evalCalls++;
+    const i = pos.hashLo & ((1 << Searcher.EVAL_CACHE_BITS) - 1);
+    if (this.evalUsed[i] && this.evalKeyLo[i] === pos.hashLo && this.evalKeyHi[i] === pos.hashHi) {
+      this.evalHits++;
+      return this.evalVal[i];
+    }
+    const v = evaluateStm(pos, this.params);
+    this.evalUsed[i] = 1;
+    this.evalKeyLo[i] = pos.hashLo;
+    this.evalKeyHi[i] = pos.hashHi;
+    this.evalVal[i] = v;
+    return v;
   }
 
   private now(): number {
@@ -429,7 +460,7 @@ export class Searcher {
       return o.quiescence ? this.qsearch(alpha, beta, ply) : this.leafEval(ply);
     }
     this.nodes++;
-    if (ply >= MAX_PLY - 2) return evaluateStm(pos, this.params);
+    if (ply >= MAX_PLY - 2) return this.evalStm();
 
     const isPv = beta - alpha > 1;
     let ttMove = 0;
@@ -444,7 +475,7 @@ export class Searcher {
 
     // Évaluation statique (utilisée par les élagages) et tendance « improving ».
     const needEval = !inCheck && (o.rfp || o.futility || o.razoring || o.nullMove || o.lmp || o.lmrLog);
-    const staticEval = needEval ? evaluateStm(pos, this.params) : -INF;
+    const staticEval = needEval ? this.evalStm() : -INF;
     this.evalStack[ply] = inCheck ? -INF : staticEval;
     const improving = !inCheck && ply >= 2 && this.evalStack[ply - 2] !== -INF && staticEval > this.evalStack[ply - 2];
 
@@ -607,7 +638,7 @@ export class Searcher {
     this.nodes++;
     const pos = this.pos;
     if (!pos.hasLegalMove()) return pos.inCheck() ? -MATE + ply : 0;
-    return evaluateStm(pos, this.params);
+    return this.evalStm();
   }
 
   private qsearch(alpha: number, beta: number, ply: number): number {
@@ -619,7 +650,7 @@ export class Searcher {
     if (ply > this.seldepth) this.seldepth = ply;
     this.checkStop();
     if (this.stopped) return 0;
-    if (ply >= MAX_PLY - 2) return evaluateStm(pos, this.params);
+    if (ply >= MAX_PLY - 2) return this.evalStm();
     if (pos.isInsufficientMaterial()) return 0;
 
     const isPv = beta - alpha > 1;
@@ -638,7 +669,7 @@ export class Searcher {
     let stand = -INF;
     const origAlpha = alpha;
     if (!inCheck) {
-      stand = evaluateStm(pos, this.params);
+      stand = this.evalStm();
       if (stand >= beta) return stand;
       if (stand > alpha) alpha = stand;
       bestScore = stand;

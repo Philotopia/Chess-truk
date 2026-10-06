@@ -118,7 +118,7 @@ export function ParamsEditor({ config, onChange }: { config: EngineConfig; onCha
 
       <section className="panel">
         <h3>Pions</h3>
-        <RankTable label="Avancement (tout pion, rangée relative)" values={e.pawnAdvancement} onChange={(v) => set('eval.pawnAdvancement', v)} />
+        <RankTable label="Avancement (tout pion, rangée relative) — règle du projet : jamais réglé automatiquement" values={e.pawnAdvancement} onChange={(v) => set('eval.pawnAdvancement', v)} />
         <RankTable label="Pion passé — milieu de partie" values={e.passedPawn.mg} onChange={(v) => set('eval.passedPawn.mg', v)} />
         <RankTable label="Pion passé — finale" values={e.passedPawn.eg} onChange={(v) => set('eval.passedPawn.eg', v)} />
         <div className="s2-head">
@@ -190,6 +190,12 @@ export function ParamsEditor({ config, onChange }: { config: EngineConfig; onCha
         {s2('eval.threats.attackedByPawn', 'Pièce attaquée par un pion')}
         {s2('eval.threats.hanging', 'Pièce attaquée non défendue')}
         {s2('eval.tempo', 'Trait (tempo)')}
+        <h4>Finale gagnante (camp faible sans pions)</h4>
+        <div className="fields3">
+          {num('eval.mopUp.edge', 'Roi faible vers le bord (EG, par case)')}
+          {num('eval.mopUp.proximity', 'Rapprochement des rois (EG, par case)')}
+          {num('eval.mopUp.minAdvantage', 'Avance matérielle minimale')}
+        </div>
       </section>
 
       <section className="panel">

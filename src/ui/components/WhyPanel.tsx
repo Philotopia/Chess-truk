@@ -23,7 +23,8 @@ function describe(e: EvalTraceEntry, board: Int8Array): { who: string; what: str
   else if ((e.key === 'passed' || e.key === 'advance') && n !== undefined) what = `${key} (${n}e rangée)`;
   else if (e.key === 'kingPressure' && n !== undefined) what = `${key} (${Math.floor(n / 1000)} attaquants, ${n % 1000} unités)`;
   else if (e.key === 'kingProximity' && n !== undefined) what = `${key} (écart de distance ${n})`;
-  else if (['centerPawn', 'centerAttack', 'space', 'openFile', 'semiOpenFile'].includes(e.key) && n !== undefined)
+  else if (e.key === 'shield' && n !== undefined) what = `${key} (${n >> 4} au contact, ${n & 15} à deux cases)`;
+  else if (['centerPawn', 'centerAttack', 'space', 'openFile', 'semiOpenFile', 'mopUpEdge', 'mopUpKings'].includes(e.key) && n !== undefined)
     what = `${key} (×${n})`;
   return { who, what };
 }

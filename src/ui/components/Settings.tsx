@@ -75,6 +75,16 @@ const OPT_LABELS: [keyof SearchOptions, string, string][] = [
   ['nullMove', 'Null move pruning', 'Passer son tour : si cela suffit, la branche est coupée.'],
   ['lmr', 'Late move reductions', 'Réduit la profondeur des coups calmes tardifs.'],
   ['checkExtension', 'Extension d’échec', 'Prolonge d’un ply les positions en échec.'],
+  ['lmrLog', 'LMR logarithmique (V2)', 'Réduction ∝ log(profondeur)·log(rang du coup), ajustée par l’historique.'],
+  ['nullMoveAdaptive', 'Null move adaptatif (V2)', 'R = 3 + profondeur/4 + marge d’évaluation.'],
+  ['rfp', 'Reverse futility pruning (V2)', 'Éval statique ≫ bêta à faible profondeur : coupure immédiate.'],
+  ['futility', 'Futility pruning (V2)', 'Coups calmes ignorés quand éval + marge ≤ alpha.'],
+  ['lmp', 'Late move pruning (V2)', 'Coups calmes tardifs ignorés à faible profondeur.'],
+  ['razoring', 'Razoring (V2)', 'Éval très basse : vérification directe par quiescence.'],
+  ['see', 'SEE (V2)', 'Évaluation statique des échanges : captures perdantes triées en dernier et élaguées.'],
+  ['qsTT', 'TT en quiescence (V2)', 'La table de transposition sert aussi dans la quiescence.'],
+  ['iir', 'Internal iterative reduction (V2)', 'Sans coup en table : profondeur − 1.'],
+  ['countermove', 'Contre-coup (V2)', 'Coup ayant réfuté le coup adverse précédent, essayé tôt.'],
 ];
 
 export function SearchOptionsEditor({ opts, onChange }: { opts: SearchOptions; onChange: (o: SearchOptions) => void }) {

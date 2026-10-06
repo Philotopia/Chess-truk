@@ -130,6 +130,17 @@ describe('recherche : exactitude', () => {
   });
 });
 
+describe('conversion des finales gagnées', () => {
+  for (const fen of ['8/8/8/8/2k5/3q4/5K2/8 b - - 0 1', '8/8/8/3k4/8/8/8/R3K3 w - - 0 1']) {
+    it(`mate seul : ${fen}`, () => {
+      const eng = new TrukEngine(defaultEngineConfig());
+      const g = new Game(fen);
+      while (!g.status().over && g.moves.length < 100) g.playUci(eng.searchGame(g.startFen, g.uciMoves(), { nodes: 20000 }).bestMove!);
+      expect(g.status().reason).toBe('checkmate');
+    });
+  }
+});
+
 describe('recherche : limites et reproductibilité', () => {
   it('limite de nœuds respectée et résultat déterministe', () => {
     const a = searcher().search(parseFen(START_FEN), { nodes: 20000 });
