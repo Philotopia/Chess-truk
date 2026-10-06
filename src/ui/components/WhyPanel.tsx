@@ -19,7 +19,7 @@ function describe(e: EvalTraceEntry, board: Int8Array): { who: string; what: str
     who = `${p ? PIECE_NAMES_FR[pieceType(p)] : 'Case'} ${sqName(e.sq)}`;
   }
   let what = key;
-  if (e.key === 'mob' && n !== undefined) what = `${key} (${n} cases sûres)`;
+  if (e.key === 'mob' && n !== undefined) what = `${key} (${n} case${n > 1 ? 's' : ''} sûre${n > 1 ? 's' : ''})`;
   else if ((e.key === 'passed' || e.key === 'advance') && n !== undefined) what = `${key} (${n}e rangée)`;
   else if (e.key === 'kingPressure' && n !== undefined) what = `${key} (${Math.floor(n / 1000)} attaquants, ${n % 1000} unités)`;
   else if (e.key === 'kingProximity' && n !== undefined) what = `${key} (écart de distance ${n})`;

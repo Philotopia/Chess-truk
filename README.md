@@ -163,6 +163,26 @@ répète et produit des parties identiques : l’interface l’indique.
 - **match** : livre d’ouvertures légal, statistiques/Elo/IC, analyse des lignes UCI, perte en centipawns, import FEN/EPD/PGN, partie complète
   Truk vs Truk et mini-tournoi **contre Stockfish WASM réel**.
 
+## Premières mesures (V1, CLI, Stockfish 18 lite WASM, 1 thread)
+
+Mesures réelles effectuées avec `npm run match` sur la machine de développement (ouvertures du livre, couleurs alternées, sans adjudication).
+Échantillons petits : lire les intervalles de confiance.
+
+| Expérience | Parties | Résultat Truk | Elo Truk − adv. (IC95) |
+|---|---|---|---|
+| Truk (toutes optimisations) vs Truk « baseline » (alpha-bêta + TT + quiescence + MVV-LVA seulement), 5 000 nœuds/coup | 40 | +23 =11 −6 (71,3 %) | +158 [+69 ; +272], LOS 99,9 % |
+| Truk 200 ms/coup vs SF Skill Level 0, profondeur 5 | 20 | +20 =0 −0 | > +287 |
+| Truk 200 ms/coup vs SF UCI_Elo 1320, 100 ms/coup | 20 | +20 =0 −0 | > +287 |
+| Truk 1 000 nœuds vs SF 1 000 nœuds | 10 | +0 =0 −10 | < −166 |
+| Truk 10 000 nœuds vs SF 10 000 nœuds | 10 | +0 =0 −10 | < −166 |
+| Truk 100 000 nœuds vs SF 100 000 nœuds | 10 | +0 =0 −10 | < −166 |
+
+Conclusion provisoire : Truk bat nettement les niveaux affaiblis de Stockfish (Skill 0, UCI_Elo 1320) mais perd systématiquement à budget de
+nœuds égal (de 1 000 à 100 000 nœuds/coup) ; Stockfish atteint une profondeur nominale bien supérieure pour le même nombre de nœuds. Les
+optimisations de recherche apportent un gain mesurable (+158 Elo à 5 000 nœuds).
+
+Vitesse (Node 22, 1 cœur) : perft ≈ 6 M nœuds/s ; évaluation ≈ 3,4 µs (≈ 290 000 évals/s) ; recherche ≈ 150 000 à 260 000 nœuds/s.
+
 ## Limitations actuelles
 
 - Force : le moteur est encore faible face à Stockfish, même à budget de nœuds égal (voir résultats ci-dessous) : évaluation manuelle simple,
@@ -173,3 +193,17 @@ répète et produit des parties identiques : l’interface l’indique.
 - Tournois exécutés séquentiellement (une partie à la fois).
 - Pas de livre d’ouvertures pour Truk en partie libre, pas de gestion de pendule (temps par coup uniquement), pas de pondération.
 - L’adjudication est désactivée par défaut (les parties vont jusqu’au bout ou à la limite de demi-coups, comptée nulle).
+
+## Prochaines améliorations (meilleur rapport gain de force / complexité)
+
+1. **Réglage automatique des coefficients (Texel tuning)** sur un dataset de positions (scores Stockfish ou résultats de parties) : la
+   structure `EngineConfig`, `TUNABLE_PARAMS`, `getByPath/setByPath` et l’onglet Dataset sont prêts ; c’est probablement le plus gros gain pour
+   une évaluation manuelle.
+2. **SEE (Static Exchange Evaluation)** : élaguer les captures perdantes en quiescence et mieux trier les captures — gain de vitesse et de
+   tactique important pour peu de code.
+3. **Élagages de bas d’arbre** : futility / reverse futility pruning, razoring, delta pruning en quiescence (chacun activable et mesurable dans le Lab A/B).
+4. **Évaluation incrémentale** (matériel + PST mis à jour dans make/unmake) et évaluation paresseuse : l’évaluation est le goulot actuel.
+5. **Heuristiques de tri supplémentaires** : countermove, IID quand il n’y a pas de coup TT.
+6. **Connaissances de finale** : facteurs de nulle (fous de couleurs opposées, pas de pions, KPK).
+7. **Statistiques séquentielles (SPRT)** et parties en parallèle (plusieurs workers) pour conclure plus vite les tests A/B.
+8. Plus tard : bitboards (si le profilage le justifie), gestion de pendule (temps total + incrément).
