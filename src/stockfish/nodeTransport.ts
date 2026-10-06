@@ -11,6 +11,10 @@ interface NodeSfEngine {
 
 export async function createNodeStockfishTransport(flavor: StockfishFlavor = 'lite-single'): Promise<UciTransport> {
   const require = createRequire(import.meta.url);
+  // Le module Emscripten ne peut être initialisé qu'une fois : on vide le cache de require
+  // pour pouvoir créer plusieurs instances indépendantes (ex. Stockfish vs Stockfish, échelle).
+  const enginePath = require.resolve(`stockfish/bin/stockfish-18-${flavor}.js`);
+  delete require.cache[enginePath];
   const init = require('stockfish') as (f: string) => Promise<NodeSfEngine>;
   const engine = await init(flavor);
   let cb: ((l: string) => void) | null = null;

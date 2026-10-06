@@ -109,6 +109,21 @@ describe('intégration : parties et tournoi contre Stockfish WASM (Node)', () =>
     expect(g.pgn).toContain('[White "A"]');
   });
 
+  it('calibration : Stockfish vs Stockfish (deux instances WASM dans le même processus)', async () => {
+    const sf = (label: string) =>
+      createNodePlayer({ kind: 'stockfish', label, settings: { flavor: 'lite-single', threads: 1, hashMB: 8, skillLevel: null, limitStrength: false, elo: 1320 }, limits: { nodes: 2000 } });
+    const a = await sf('SF-A');
+    const b = await sf('SF-B');
+    const g = await playGame(a, b, { maxPlies: 60 });
+    expect(g.reason).not.toBe('error');
+    expect(g.moves.length).toBeGreaterThan(10);
+    a.dispose();
+    b.dispose();
+    const c = await sf('SF-C'); // troisième instance après fermeture
+    expect((await c.think(new Game().startFen, [])).uci).toMatch(/^[a-h][1-8][a-h][1-8]/);
+    c.dispose();
+  }, 120_000);
+
   it('mini-tournoi Truk vs Stockfish (2 parties, couleurs alternées)', async () => {
     const rec = await runTournament(
       {
