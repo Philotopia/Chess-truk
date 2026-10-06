@@ -29,6 +29,7 @@ export const EVAL_TERMS = [
   'development',
   'threats',
   'tempo',
+  'mopUp',
 ] as const;
 export type EvalTerm = (typeof EVAL_TERMS)[number];
 
@@ -49,6 +50,7 @@ export const EVAL_TERM_LABELS: Record<EvalTerm, string> = {
   development: 'Développement',
   threats: 'Menaces',
   tempo: 'Trait (tempo)',
+  mopUp: 'Finale gagnante (roi adverse au bord)',
 };
 
 /** Recouvrements connus entre composantes : affichés dans l'interface pour éviter les doubles comptes invisibles. */
@@ -64,6 +66,9 @@ export const EVAL_TERM_NOTES: Partial<Record<EvalTerm, string>> = {
   development: 'Corrélé avec la PST (un cavalier en b1 y est déjà pénalisé).',
   kingEndgame: 'Proximité des rois aux pions passés (finale). La centralisation du roi est dans la PST « roi finale ».',
   threats: 'Évaluation statique : ne tient pas compte du trait (la quiescence résout les captures).',
+  mopUp:
+    'Uniquement si le camp le plus faible n’a plus de pions et que l’écart matériel dépasse le seuil : bonus pour repousser son roi ' +
+    'vers le bord et en rapprocher le roi fort (finale seulement). Recoupe un peu la PST « roi finale ».',
 };
 
 export const PIECE_KEYS = ['pawn', 'knight', 'bishop', 'rook', 'queen', 'king'] as const;
@@ -112,6 +117,8 @@ export interface EvalParams {
   development: { undevelopedMinor: number };
   threats: { attackedByPawn: Score2; hanging: Score2 };
   tempo: Score2;
+  /** Finale gagnante : par case de distance du roi faible au centre, et par case de rapprochement des rois. */
+  mopUp: { edge: number; proximity: number; minAdvantage: number };
   /** Activation de chaque composante (false = composante ignorée). */
   enabled: Record<EvalTerm, boolean>;
 }
@@ -130,6 +137,27 @@ export interface SearchOptions {
   nullMove: boolean;
   lmr: boolean;
   checkExtension: boolean;
+  // --- V2 : chaque technique reste activable séparément pour mesurer son effet ---
+  /** Réductions LMR logarithmiques (profondeur × rang du coup), ajustées par l'historique. Sinon : 1 ou 2 plies. */
+  lmrLog: boolean;
+  /** Null move à réduction adaptative R = 3 + prof/4 (+ marge d'éval). Sinon : R = 2 ou 3. */
+  nullMoveAdaptive: boolean;
+  /** Reverse futility pruning : éval statique largement ≥ bêta à faible profondeur → coupure. */
+  rfp: boolean;
+  /** Futility pruning : coups calmes ignorés si l'éval + marge reste ≤ alpha. */
+  futility: boolean;
+  /** Late move pruning : au-delà d'un nombre de coups calmes, les suivants sont ignorés à faible profondeur. */
+  lmp: boolean;
+  /** Razoring : éval très basse à faible profondeur → vérification par quiescence. */
+  razoring: boolean;
+  /** SEE : captures perdantes triées en dernier, élaguées en quiescence et à faible profondeur. */
+  see: boolean;
+  /** Table de transposition aussi en quiescence. */
+  qsTT: boolean;
+  /** Internal iterative reduction : sans coup en table, profondeur − 1. */
+  iir: boolean;
+  /** Heuristique du contre-coup (réponse ayant réfuté le coup adverse précédent). */
+  countermove: boolean;
 }
 
 export interface EngineConfig {
@@ -256,6 +284,7 @@ export function defaultEvalParams(): EvalParams {
     development: { undevelopedMinor: -10 },
     threats: { attackedByPawn: S(-20, -15), hanging: S(-10, -10) },
     tempo: S(10, 5),
+    mopUp: { edge: 10, proximity: 4, minAdvantage: 300 },
     enabled,
   };
 }
@@ -274,6 +303,33 @@ export function defaultSearchOptions(): SearchOptions {
     nullMove: true,
     lmr: true,
     checkExtension: true,
+    lmrLog: true,
+    nullMoveAdaptive: true,
+    rfp: true,
+    futility: true,
+    lmp: true,
+    razoring: true,
+    see: true,
+    qsTT: true,
+    iir: true,
+    countermove: true,
+  };
+}
+
+/** Options de recherche de la V1 (pour comparer les versions à l'identique). */
+export function v1SearchOptions(): SearchOptions {
+  return {
+    ...defaultSearchOptions(),
+    lmrLog: false,
+    nullMoveAdaptive: false,
+    rfp: false,
+    futility: false,
+    lmp: false,
+    razoring: false,
+    see: false,
+    qsTT: false,
+    iir: false,
+    countermove: false,
   };
 }
 
@@ -284,7 +340,7 @@ export function defaultEngineConfig(name = 'Truk v1'): EngineConfig {
 /** Configuration minimale imposée par le cahier des charges V1 (sans optimisations avancées). */
 export function baselineSearchOptions(): SearchOptions {
   return {
-    ...defaultSearchOptions(),
+    ...v1SearchOptions(),
     killers: false,
     history: false,
     pvs: false,

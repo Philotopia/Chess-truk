@@ -5,7 +5,7 @@ import { SF_VERSION } from '../stockfish/presets';
 import { openingForGame, openingToUci } from './openings';
 import { playGame, type PlayGameOptions } from './runner';
 import { type MatchStats, computeStats } from './stats';
-import type { AdjudicationSettings, GameRecord, LiveInfo, PlayedMove, PlayerFactory, PlayerSpec } from './types';
+import type { AdjudicationSettings, GameRecord, LiveInfo, PlayedMove, Player, PlayerFactory, PlayerSpec } from './types';
 import type { Game } from '../core/game';
 
 export const APP_VERSION = '0.1.0';
@@ -15,7 +15,9 @@ export interface TournamentConfig {
   a: PlayerSpec;
   b: PlayerSpec;
   games: number;
-  openings: 'book' | 'startpos';
+  /** book : livre ; random : livre + 2 à 4 demi-coups aléatoires équilibrés (graine) ; startpos : position initiale. */
+  openings: 'book' | 'startpos' | 'random';
+  openingSeed?: number;
   /** Décalage dans le livre (pour varier les ouvertures entre deux tournois). */
   openingOffset: number;
   maxPlies: number;
@@ -78,39 +80,11 @@ export async function runTournament(
         rec.status = 'aborted';
         break;
       }
-      const aIsWhite = i % 2 === 0;
-      const white = aIsWhite ? pa : pb;
-      const black = aIsWhite ? pb : pa;
-      const opening = openingForGame(i, config.openings, config.openingOffset);
-      cb.onGameStart?.(i, white.name, black.name, opening.name);
-      const played = await playGame(white, black, {
-        startFen: START_FEN,
-        openingMoves: openingToUci(opening),
-        maxPlies: config.maxPlies,
-        adjudication: config.adjudication,
-        pgnHeaders: { Event: config.name, Round: String(i + 1), Opening: opening.name },
-        onMove: (g, m) => cb.onMove?.(i, g, m),
-        onInfo: cb.onInfo,
-        shouldAbort: cb.shouldAbort,
-      });
-      if (played.reason === 'aborted') {
+      const gr = await playTournamentGame(config, i, pa, pb, cb);
+      if (!gr) {
         rec.status = 'aborted';
         break;
       }
-      const gr: GameRecord = {
-        index: i,
-        aIsWhite,
-        white: white.name,
-        black: black.name,
-        openingName: opening.name,
-        startFen: played.game.startFen,
-        moves: played.moves,
-        result: played.result,
-        reason: played.reason,
-        errorMessage: played.errorMessage,
-        durationMs: played.durationMs,
-        pgn: played.pgn,
-      };
       rec.games.push(gr);
       rec.stats = computeStats(rec.games);
       cb.onGameEnd?.(gr, rec);
@@ -123,6 +97,46 @@ export async function runTournament(
   rec.finishedAt = new Date().toISOString();
   rec.stats = computeStats(rec.games);
   return rec;
+}
+
+/** Joue la partie n° i d'un tournoi (couleurs et ouverture déterminées par i). null si interrompue. */
+export async function playTournamentGame(
+  config: TournamentConfig,
+  i: number,
+  pa: Player,
+  pb: Player,
+  cb: TournamentCallbacks = {},
+): Promise<GameRecord | null> {
+  const aIsWhite = i % 2 === 0;
+  const white = aIsWhite ? pa : pb;
+  const black = aIsWhite ? pb : pa;
+  const opening = openingForGame(i, config.openings, config.openingOffset, config.openingSeed ?? 1);
+  cb.onGameStart?.(i, white.name, black.name, opening.name);
+  const played = await playGame(white, black, {
+    startFen: START_FEN,
+    openingMoves: openingToUci(opening),
+    maxPlies: config.maxPlies,
+    adjudication: config.adjudication,
+    pgnHeaders: { Event: config.name, Round: String(i + 1), Opening: opening.name },
+    onMove: (g, m) => cb.onMove?.(i, g, m),
+    onInfo: cb.onInfo,
+    shouldAbort: cb.shouldAbort,
+  });
+  if (played.reason === 'aborted') return null;
+  return {
+    index: i,
+    aIsWhite,
+    white: white.name,
+    black: black.name,
+    openingName: opening.name,
+    startFen: played.game.startFen,
+    moves: played.moves,
+    result: played.result,
+    reason: played.reason,
+    errorMessage: played.errorMessage,
+    durationMs: played.durationMs,
+    pgn: played.pgn,
+  };
 }
 
 export function tournamentPgn(rec: TournamentRecord): string {

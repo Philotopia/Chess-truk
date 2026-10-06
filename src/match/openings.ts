@@ -2,6 +2,11 @@
 // ce qui neutralise l'avantage du trait et évite des parties identiques avec des moteurs déterministes.
 import { Game } from '../core/game';
 import { START_FEN } from '../core/types';
+import { defaultEvalParams, defaultSearchOptions } from '../engine/params';
+import { Searcher } from '../engine/search';
+import OPENING_SUITE_RAW from './openingSuite.json';
+
+const OPENING_SUITE = OPENING_SUITE_RAW as Opening[];
 
 export interface Opening {
   name: string;
@@ -53,10 +58,67 @@ export const OPENING_BOOK: Opening[] = [
   L('Catalane fermée', 'd4 d5 c4 e6 Nf3 Nf6 g3 Be7'),
 ];
 
-/** Ouvertures pour n parties (une ouverture par paire de parties). */
-export function openingForGame(gameIndex: number, mode: 'book' | 'startpos', seedOffset = 0): Opening {
+function mulberry32(seed: number): () => number {
+  let a = seed >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+const randomCache = new Map<string, Opening>();
+let balanceSearcher: Searcher | null = null;
+
+/**
+ * Ouverture du livre prolongée de 2 à 4 demi-coups aléatoires (graine déterministe), retenue seulement si une
+ * recherche courte de Truk la juge équilibrée (|score| < 100 cp). Permet des milliers de parties distinctes.
+ */
+export function randomOpening(pair: number, seed: number): Opening {
+  const key = `${seed}:${pair}`;
+  const cached = randomCache.get(key);
+  if (cached) return cached;
+  const rand = mulberry32(seed * 1000003 + pair * 7919 + 17);
+  const base = OPENING_BOOK[pair % OPENING_BOOK.length];
+  if (!balanceSearcher) {
+    balanceSearcher = new Searcher(defaultEvalParams(), { ...defaultSearchOptions(), ttSizeMB: 1 });
+  }
+  let result: Opening = base;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    const g = new Game(START_FEN);
+    for (const s of base.moves) g.playSan(s);
+    const extra = 2 + Math.floor(rand() * 3);
+    let ok = true;
+    for (let k = 0; k < extra; k++) {
+      const ms = g.pos.legalMoves();
+      if (!ms.length) {
+        ok = false;
+        break;
+      }
+      g.play(ms[Math.floor(rand() * ms.length)]);
+    }
+    if (!ok || g.status().over) continue;
+    balanceSearcher.newGame();
+    const r = balanceSearcher.search(g.pos, { depth: 4 });
+    if (r.mate === null && Math.abs(r.score) < 100) {
+      result = { name: `${base.name} +${extra}`, moves: g.moves.map((m) => m.san) };
+      break;
+    }
+  }
+  randomCache.set(key, result);
+  return result;
+}
+
+/** Ouvertures pour n parties (une ouverture par paire de parties, couleurs inversées). */
+export function openingForGame(gameIndex: number, mode: 'book' | 'startpos' | 'random', seedOffset = 0, seed = 1): Opening {
   if (mode === 'startpos') return { name: 'Position initiale', moves: [] };
   const pair = Math.floor(gameIndex / 2);
+  if (mode === 'random') {
+    // Suite figée (identique pour toutes les versions du moteur) ; génération à la volée au-delà.
+    const idx = pair + seedOffset + (seed - 1) * 7919;
+    return idx < OPENING_SUITE.length ? OPENING_SUITE[idx % OPENING_SUITE.length] : randomOpening(idx, seed);
+  }
   return OPENING_BOOK[(pair + seedOffset) % OPENING_BOOK.length];
 }
 

@@ -5,7 +5,7 @@ import type { Position } from '../src/core/position';
 import { START_FEN } from '../src/core/types';
 import { TrukEngine } from '../src/engine/engine';
 import { evaluateStm } from '../src/engine/evaluate';
-import { type SearchOptions, defaultEngineConfig, defaultEvalParams, defaultSearchOptions } from '../src/engine/params';
+import { type SearchOptions, defaultEngineConfig, defaultEvalParams, defaultSearchOptions, v1SearchOptions } from '../src/engine/params';
 import { MATE, Searcher, mateIn } from '../src/engine/search';
 import { TT_EXACT, TT_LOWER, TranspositionTable } from '../src/engine/tt';
 
@@ -15,16 +15,14 @@ function searcher(opts: Partial<SearchOptions> = {}) {
   return new Searcher(params, { ...defaultSearchOptions(), ...opts });
 }
 
+/** Toutes les options booléennes désactivées sauf le tri MVV-LVA (alpha-bêta pur, ordre raisonnable). */
 const ALL_OFF: Partial<SearchOptions> = {
-  useTT: false,
-  quiescence: false,
-  killers: false,
-  history: false,
-  pvs: false,
-  aspiration: false,
-  nullMove: false,
-  lmr: false,
-  checkExtension: false,
+  ...(Object.fromEntries(
+    Object.entries(defaultSearchOptions())
+      .filter(([, v]) => typeof v === 'boolean')
+      .map(([k]) => [k, false]),
+  ) as Partial<SearchOptions>),
+  mvvLva: true,
 };
 
 /** Minimax brut sans élagage, mêmes règles de feuille que la recherche sans quiescence. */
@@ -76,6 +74,7 @@ describe('recherche : exactitude', () => {
 
   const VARIANTS: Partial<SearchOptions>[] = [
     {},
+    v1SearchOptions(),
     ALL_OFF,
     { ...ALL_OFF, quiescence: true },
     { nullMove: false },

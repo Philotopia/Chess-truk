@@ -29,6 +29,7 @@ export const T_OUTPOSTS = 12;
 export const T_DEVELOPMENT = 13;
 export const T_THREATS = 14;
 export const T_TEMPO = 15;
+export const T_MOPUP = 16;
 const NT = EVAL_TERMS.length;
 
 export const MAX_PHASE = 24;
@@ -93,6 +94,8 @@ export const TRACE_KEY_LABELS: Record<string, string> = {
   attackedByPawn: 'attaqué par un pion',
   hanging: 'pièce en prise',
   tempo: 'trait',
+  mopUpEdge: 'roi adverse repoussé au bord',
+  mopUpKings: 'rapprochement des rois',
 };
 
 // --- Paramètres compilés en tableaux plats (recalculés si l'objet change) ---
@@ -525,7 +528,8 @@ function run(pos: Position, params: EvalParams): number {
       const rel = c === WHITE ? kr : 7 - kr;
       const fwd = c === WHITE ? 16 : -16;
       const ownPawn = PAWN | (c << 3);
-      let shield = 0;
+      let n1 = 0;
+      let n2 = 0;
       let open = 0;
       let semi = 0;
       for (let f = kf - 1; f <= kf + 1; f++) {
@@ -533,15 +537,16 @@ function run(pos: Position, params: EvalParams): number {
         if (rel <= 1) {
           const s1 = k + fwd + (f - kf);
           const s2 = s1 + fwd;
-          if (!(s1 & 0x88) && b[s1] === ownPawn) shield += ks.shieldRank1;
-          else if (!(s2 & 0x88) && b[s2] === ownPawn) shield += ks.shieldRank2;
+          if (!(s1 & 0x88) && b[s1] === ownPawn) n1++;
+          else if (!(s2 & 0x88) && b[s2] === ownPawn) n2++;
         }
         if (fileCount[c][f] === 0) {
           if (fileCount[them][f] === 0) open++;
           else semi++;
         }
       }
-      if (shield) add(T_KING_SAFETY, c, shield, 0, k, 'shield');
+      const shield = n1 * ks.shieldRank1 + n2 * ks.shieldRank2;
+      if (shield) add(T_KING_SAFETY, c, shield, 0, k, 'shield', n1 * 16 + n2);
       if (open) add(T_KING_SAFETY, c, open * ks.openFile, 0, k, 'openFile', open);
       if (semi) add(T_KING_SAFETY, c, semi * ks.semiOpenFile, 0, k, 'semiOpenFile', semi);
       if (kAttackers[c] >= ks.minAttackers && kUnits[c] > 0) {
@@ -570,6 +575,29 @@ function run(pos: Position, params: EvalParams): number {
   }
 
   if (on[T_TEMPO]) add(T_TEMPO, pos.side, P.tempo.mg, P.tempo.eg, -1, 'tempo');
+
+  if (on[T_MOPUP]) {
+    const cnt = pos.counts;
+    const v = C.value;
+    let wm = 0;
+    let bm = 0;
+    for (let t = PAWN; t <= QUEEN; t++) {
+      wm += cnt[t] * v[t];
+      bm += cnt[t | 8] * v[t];
+    }
+    const strong: Color = wm >= bm ? WHITE : BLACK;
+    const weak = (strong ^ 1) as Color;
+    if (Math.abs(wm - bm) >= P.mopUp.minAdvantage && cnt[PAWN | (weak << 3)] === 0) {
+      const wk = pos.kingSq[weak];
+      const sk = pos.kingSq[strong];
+      const f = wk & 7;
+      const r = wk >> 4;
+      const cmd = Math.max(3 - f, f - 4) + Math.max(3 - r, r - 4); // 0 (centre) … 6 (coin)
+      const md = Math.abs((wk & 7) - (sk & 7)) + Math.abs((wk >> 4) - (sk >> 4));
+      if (cmd) add(T_MOPUP, strong, 0, P.mopUp.edge * cmd, wk, 'mopUpEdge', cmd);
+      if (md < 14) add(T_MOPUP, strong, 0, P.mopUp.proximity * (14 - md), sk, 'mopUpKings', 14 - md);
+    }
+  }
 
   const phase = gamePhase(pos);
   let mg = 0;

@@ -80,6 +80,8 @@ export class TranspositionTable {
   store(lo: number, hi: number, depth: number, flag: number, score: number, move: number): void {
     const i = lo & this.mask;
     const same = this.keyHi[i] === hi && this.keyLo[i] === lo;
+    // Même position, même recherche : on ne remplace pas une entrée nettement plus profonde (ex. entrée de quiescence).
+    if (same && this.ages[i] === this.age && depth + 2 < this.depths[i] && this.flags[i] !== 0) return;
     if (this.flags[i] === 0 || same || this.ages[i] !== this.age || depth >= this.depths[i]) {
       // Conserver le coup existant si on n'en fournit pas pour la même position.
       if (move !== 0 || !same) this.moves[i] = move;
