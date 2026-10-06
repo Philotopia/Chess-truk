@@ -31,7 +31,7 @@ self.onmessage = (e: MessageEvent<{ type: 'perft' | 'bench'; maxNodes?: number; 
     let time = 0;
     for (const fen of BENCH) {
       const s = new Searcher(defaultEvalParams(), defaultSearchOptions());
-      const r = s.search(parseFen(fen), { depth: e.data.depth ?? 6 });
+      const r = s.search(parseFen(fen), { timeMs: 1500 });
       nodes += r.nodes;
       time += r.timeMs;
       self.postMessage({ type: 'bench', fen, depth: r.completedDepth, nodes: r.nodes, ms: r.timeMs, nps: r.nps, best: r.bestMove });

@@ -25,7 +25,10 @@ Autres commandes :
 | `npm run typecheck` | Vérification TypeScript |
 | `npm run perft` | Perft complet, y compris les profondeurs > 5 M de nœuds (≈ 2 min) |
 | `npm run bench` | Vitesse : perft, évaluations/s, recherche nœuds/s |
-| `npm run match -- …` | Tournoi sans interface (résultats JSON + PGN dans `results/`) |
+| `npm run match -- …` | Tournoi sans interface, en parallèle (`-j 4`), avec SPRT optionnel (résultats JSON + PGN dans `results/`) |
+| `npm run texel-gen -- …` | Génère des positions étiquetées par self-play Truk (aucun Stockfish) |
+| `npm run texel-tune -- …` | Réglage Texel des coefficients sous contraintes (écrit une config JSON) |
+| `npm run gen-openings` | Régénère la suite figée de 1000 ouvertures équilibrées |
 | `npm run e2e` | Test de fumée de l’interface dans Chromium (après `npm run build && npm run preview` ; nécessite Playwright et un Chromium) |
 
 Exemples de tournois en ligne de commande :
@@ -36,10 +39,13 @@ npm run match -- --games 20 --truk-time 200 --sf-skill 0 --sf-depth 5
 npm run match -- --games 20 --truk-time 200 --sf-elo 1320 --sf-time 100
 npm run match -- --ladder 1000,10000,100000 --games 10          # échelle en nœuds
 npm run match -- --games 40 --nodes 5000 --b-config autre.json  # Truk A vs Truk B (config exportée depuis l’interface)
+npm run match -- --b-config configs/truk-v1.json --truk-time 100 --openings random --games 200 -j 4   # V2 contre V1
+npm run match -- --b-set "search.lmr=false" --truk-time 50 --openings random --sprt 0,10 --games 4000 -j 4 --quiet  # test A/B séquentiel
 ```
 
 Options : `--truk-nodes/--truk-time/--truk-depth`, `--sf-nodes/--sf-time/--sf-depth`, `--sf-skill`, `--sf-elo`, `--a-config`,
-`--b-config`, `--max-plies`, `--openings startpos`, `--opening-offset`, `--adjudicate`.
+`--b-config`, `--a-set/--b-set "chemin=valeur;…"`, `--b-search v1`, `-j N` (parties en parallèle), `--sprt elo0,elo1`, `--max-plies`,
+`--openings book|random|startpos`, `--opening-offset`, `--seed`, `--adjudicate`, `--quiet`.
 
 ## Interface
 
@@ -78,6 +84,8 @@ src/
     search.ts       negamax alpha-bêta, approfondissement itératif, quiescence, tri, killers, historique,
                     PVS, aspiration, null move, LMR, extension d'échec — chacun activable
     tt.ts           table de transposition (tableaux typés)
+    see.ts          SEE (évaluation statique des échanges)
+    tuning.ts       réglage Texel : décomposition linéaire de l'évaluation, contraintes, Adam
     engine.ts       façade : configuration + recherche sur (FEN de départ, coups)
   stockfish/   interface Stockfish
     uci.ts          client UCI générique (indépendant du transport)
@@ -88,13 +96,17 @@ src/
     tournament.ts   alternance des couleurs, ouvertures appariées, enregistrement reproductible
     openings.ts     40 ouvertures équilibrées
     stats.ts        V/N/D, score, Elo, IC95, LOS, moyennes par joueur
+    sprt.ts         test séquentiel (SPRT) pour les comparaisons A/B
+    parallel.ts     tournois en parallèle (processus fils) pour la CLI
+    openingSuite.json  1000 ouvertures équilibrées figées (identiques pour toutes les versions)
     compare.ts      comparaison Truk/SF, perte en centipawns, classification des coups
     dataset.ts      import FEN/EPD/PGN, résultats par position, CSV
     players.ts, factoryNode.ts, factoryBrowser.ts   joueurs (Truk en worker ou en ligne, Stockfish)
   storage/db.ts   IndexedDB (tournois, configs, datasets, analyses), export/import JSON
   workers/        engine.worker.ts (recherche Truk), diag.worker.ts (perft/bench), engineClient.ts
   ui/             React : App, vues, composants (échiquier, barre d'éval, graphique, « Pourquoi ? »)
-scripts/        perft.ts, bench.ts, match.ts (CLI), copy-stockfish.mjs
+scripts/        perft.ts, bench.ts, match.ts (CLI), texel-gen.ts, texel-tune.ts, gen-openings.ts, copy-stockfish.mjs
+configs/        truk-v1.json, truk-v2.json (configurations complètes reproductibles)
 tests/          perft, règles (+ comparaison croisée chess.js), évaluation, recherche, match, e2e/
 ```
 
@@ -130,7 +142,10 @@ cavalier ↔ mobilité ↔ centre ; développement ↔ PST) sont **nommés** dan
 Negamax alpha-bêta, approfondissement itératif, table de transposition (scores de mat corrigés par le ply), tri des coups (coup TT, MVV-LVA,
 promotions, killers, historique), quiescence (captures et promotions ; toutes les parades en échec, donc mats détectés), élagage par distance au
 mat, nulles (répétition dès la 2e occurrence dans l’arbre, 50 coups, matériel insuffisant). Options activables séparément : TT, quiescence,
-MVV-LVA, killers, historique, PVS, fenêtres d’aspiration, null move, LMR, extension d’échec.
+MVV-LVA, killers, historique, PVS, fenêtres d’aspiration, null move, LMR, extension d’échec, et (V2) LMR logarithmique ajustée par
+l’historique, null move adaptatif, reverse futility pruning, futility pruning, late move pruning, razoring, SEE (tri et élagage des captures
+perdantes, delta pruning), TT en quiescence, internal iterative reduction, contre-coup, extensions singulières (désactivées par défaut :
+neutres en SPRT). Un cache d’évaluation évite de réévaluer les positions revues. `configs/truk-v1.json` reproduit la configuration V1.
 
 Limites : profondeur, nœuds, temps (la première atteinte arrête ; la profondeur 1 est toujours terminée ; en cas d’arrêt en cours d’itération,
 seul un coup racine entièrement évalué au-dessus d’alpha peut remplacer celui de l’itération précédente). Avec une limite en nœuds ou en
@@ -148,7 +163,7 @@ répète et produit des parties identiques : l’interface l’indique.
 
 ## Tests
 
-`npm test` exécute 5 fichiers / 78 tests (≈ 1 min) :
+`npm test` exécute 7 fichiers / 90 tests (≈ 2 min) :
 
 - **perft** : 6 positions de référence (initiale, Kiwipete, positions 3–6 et miroir), jusqu’à 4,9 M de nœuds, avec vérification que
   make/unmake restaure le hachage ; `npm run perft` va jusqu’à 194 M de nœuds ;
@@ -160,8 +175,47 @@ répète et produit des parties identiques : l’interface l’indique.
 - **recherche** : alpha-bêta (+ killers, historique, PVS, aspiration) = minimax exact ; mats en 1 et 2 trouvés avec 8 combinaisons d’options ;
   scores de mat/pat ; évitement du pat ; gain de matériel ; nulle par répétition choisie par le camp perdant ; limites de nœuds/temps ;
   déterminisme ; PV légale ; TT (sonde, collisions, remplacement, réduction du nombre de nœuds) ;
+- **SEE** : pièce non défendue, échanges, rayons X, roi ne reprenant pas sur une case défendue, promotion ;
+- **réglage Texel** : la décomposition linéaire reproduit l’évaluation ; la règle des pions est verrouillée (avancement et PST pions non
+  réglables, pions passés ≥ 0 et croissants) ;
+- **conversion** : roi + dame / roi + tour contre roi seul sont matés ;
 - **match** : livre d’ouvertures légal, statistiques/Elo/IC, analyse des lignes UCI, perte en centipawns, import FEN/EPD/PGN, partie complète
   Truk vs Truk et mini-tournoi **contre Stockfish WASM réel**.
+
+## Truk V2 : ce qui a été fait et mesuré
+
+Règle imposée : **les pions les plus avancés valent beaucoup plus, en proportion de leur avancement.** La table d’avancement
+(0, 5, 12, 25, 50, 100 de la 2e à la 7e rangée) n’est jamais modifiée par le réglage automatique ; la PST des pions (qui pourrait la compenser)
+est figée ; les bonus de pion passé sont contraints ≥ 0 et croissants avec la rangée. Valeur effective d’un pion passé en finale (pion + avancement
++ bonus passé) : V1 110 / 115 / 127 / 150 / 190 / 260 → V2 126 / 131 / 153 / 192 / 238 / 288 cp (rangées 2 à 7).
+
+Méthode : chaque changement est mesuré contre la version précédente par SPRT (H0 : 0 Elo, H1 : +10 Elo, α = β = 5 %), parties à 50 ms/coup en
+parallèle sur 4 cœurs, ouvertures tirées d’une suite figée de 1000 positions équilibrées (`src/match/openingSuite.json`), couleurs inversées.
+
+| Étape | Parties | Résultat | Décision |
+|---|---|---|---|
+| Recherche V2 (SEE, RFP, futility, LMP, razoring, LMR log, null move adaptatif, IIR, contre-coup, TT en quiescence) vs recherche V1 | 144 | +93 =24 −27, **+172 Elo [+119 ; +234]** | adoptée |
+| Composante « finale gagnante » (roi adverse au bord) | 500 | 48,3 %, non significatif | gardée (corrige la non-conversion de R+D contre R observée ; testée unitairement) |
+| Réglage Texel n° 1 *sans contraintes sur les tables pièce-case* | 150 | **−167 Elo** (surapprentissage : roi en a8 = +200…) | rejeté |
+| Réglage Texel n° 1 : ~60 coefficients scalaires, contraintes de signe, positions calmes (quiescence) | 799 | **+42 Elo [+20 ; +65]** | adopté |
+| Extensions singulières | 551 | 50,9 %, neutre | désactivées par défaut |
+| Réglage Texel n° 2 (590 000 positions issues du moteur amélioré) | 789 | **+38 Elo [+17 ; +58]** | adopté |
+
+Les données du réglage Texel proviennent **uniquement de parties Truk contre Truk** (résultat final de la partie comme étiquette) :
+Stockfish n’intervient pas dans le choix des coups ni dans le réglage.
+
+Mesures finales (100 ms/coup, mêmes 60 ouvertures pour chaque ligne ; V1 = code figé du commit 7189025) :
+
+| Adversaire | V1 | V2 |
+|---|---|---|
+| Stockfish profondeur 6 | 35,8 % (−101 Elo) | **48,3 %** (−12 Elo, IC95 [−83 ; +59]) |
+| Stockfish profondeur 8 | 6,7 % (−458 Elo) | **12,5 %** (−338 Elo) |
+| Stockfish profondeur 10 | — | 1,7 % |
+| Truk V2 contre configuration V1 (200 parties) | — | **86,3 %, +319 Elo [+267 ; +386]** |
+| Stockfish pleine force, 200 ms/coup (30 parties) | 0/30 | 0/30 |
+
+Lecture : environ +100 Elo contre l’étalon externe Stockfish à profondeur fixe (l’écart en self-play, +319, est comme toujours plus flatteur).
+Contre Stockfish à pleine force, l’écart reste hors de portée de ces techniques.
 
 ## Premières mesures (V1, CLI, Stockfish 18 lite WASM, 1 thread)
 
@@ -190,20 +244,16 @@ Vitesse (Node 22, 1 cœur) : perft ≈ 6 M nœuds/s ; évaluation ≈ 3,4 µs (�
 - Les nœuds Truk et Stockfish ne sont pas strictement comparables (Stockfish élague beaucoup plus et utilise un réseau NNUE).
 - Stockfish WASM « lite » : réseau réduit, plus lent que le natif ; Skill Level / UCI_Elo ne sont pas reproductibles ; UCI_Elo ≥ 1320.
 - Arrêt d’une recherche Truk en cours : réalisé en recréant le worker (la recherche est synchrone) ; la dernière itération terminée est conservée.
-- Tournois exécutés séquentiellement (une partie à la fois).
+- Tournois de l’interface exécutés séquentiellement (la CLI joue en parallèle avec `-j`).
 - Pas de livre d’ouvertures pour Truk en partie libre, pas de gestion de pendule (temps par coup uniquement), pas de pondération.
 - L’adjudication est désactivée par défaut (les parties vont jusqu’au bout ou à la limite de demi-coups, comptée nulle).
 
 ## Prochaines améliorations (meilleur rapport gain de force / complexité)
 
-1. **Réglage automatique des coefficients (Texel tuning)** sur un dataset de positions (scores Stockfish ou résultats de parties) : la
-   structure `EngineConfig`, `TUNABLE_PARAMS`, `getByPath/setByPath` et l’onglet Dataset sont prêts ; c’est probablement le plus gros gain pour
-   une évaluation manuelle.
-2. **SEE (Static Exchange Evaluation)** : élaguer les captures perdantes en quiescence et mieux trier les captures — gain de vitesse et de
-   tactique important pour peu de code.
-3. **Élagages de bas d’arbre** : futility / reverse futility pruning, razoring, delta pruning en quiescence (chacun activable et mesurable dans le Lab A/B).
-4. **Évaluation incrémentale** (matériel + PST mis à jour dans make/unmake) et évaluation paresseuse : l’évaluation est le goulot actuel.
-5. **Heuristiques de tri supplémentaires** : countermove, IID quand il n’y a pas de coup TT.
-6. **Connaissances de finale** : facteurs de nulle (fous de couleurs opposées, pas de pions, KPK).
-7. **Statistiques séquentielles (SPRT)** et parties en parallèle (plusieurs workers) pour conclure plus vite les tests A/B.
-8. Plus tard : bitboards (si le profilage le justifie), gestion de pendule (temps total + incrément).
+1. **Plus de données de réglage** (self-play plus long et plus profond) et réglage des tables pièce-case avec régularisation : avec
+   590 000 positions, les PST n’apportaient rien de mesurable.
+2. **Vitesse** : l’évaluation représente ~50 % du temps ; évaluation incrémentale (matériel + PST), listes de pièces, table de hachage des pions.
+3. **Réglage des constantes de recherche** (marges de futility/RFP, table LMR) par SPRT ou SPSA.
+4. **Historique de continuation** et capture history pour le tri des coups.
+5. **Connaissances de finale** : facteurs de nulle (fous de couleurs opposées, absence de pions), finales de pions.
+6. Extensions singulières à retester à cadence plus longue (neutres à 50 ms/coup).

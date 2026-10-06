@@ -1,5 +1,5 @@
 import { useRef, useState } from 'react';
-import { TUNABLE_PARAMS, defaultEngineConfig, diffConfigs, getByPath, normalizeConfig } from '../../engine/params';
+import { TUNABLE_PARAMS, defaultEngineConfig, diffConfigs, getByPath, normalizeConfig, v1EvalParams, v1SearchOptions } from '../../engine/params';
 import { downloadText } from '../../storage/db';
 import { ParamsEditor } from '../components/ParamsEditor';
 import { SearchOptionsEditor } from '../components/Settings';
@@ -49,8 +49,15 @@ export function ParamsView() {
               e.target.value = '';
             }}
           />
-          <button className="btn" onClick={() => confirm('Revenir aux valeurs par défaut ?') && lab.setConfig(defaultEngineConfig(c.name))}>
-            Réinitialiser
+          <button className="btn" onClick={() => confirm('Revenir aux valeurs par défaut (V2) ?') && lab.setConfig(defaultEngineConfig(c.name))}>
+            Réinitialiser (V2)
+          </button>
+          <button
+            className="btn"
+            title="Évaluation réglée à la main et recherche de la V1, pour comparaison"
+            onClick={() => lab.setConfig({ ...defaultEngineConfig('Truk V1'), eval: v1EvalParams(), search: v1SearchOptions() })}
+          >
+            Charger la V1
           </button>
         </div>
         {msg && <div className="muted small">{msg}</div>}

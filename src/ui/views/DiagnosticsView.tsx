@@ -96,7 +96,7 @@ export function DiagnosticsView() {
       </section>
       <section className="col-main">
         <div className="panel">
-          <h3>Banc de vitesse (recherche, profondeur 6)</h3>
+          <h3>Banc de vitesse (recherche, 1,5 s par position)</h3>
           <button className="btn primary" disabled={!!busy} onClick={() => runWorker('bench')}>
             Lancer le banc
           </button>
