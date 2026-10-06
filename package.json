@@ -1,0 +1,35 @@
+{
+  "name": "chess-truk-lab",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Laboratoire expérimental pour un moteur d'échecs explicable, comparé à Stockfish",
+  "scripts": {
+    "postinstall": "node scripts/copy-stockfish.mjs",
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc -b --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "perft": "tsx scripts/perft.ts",
+    "bench": "tsx scripts/bench.ts",
+    "match": "tsx scripts/match.ts"
+  },
+  "dependencies": {
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.4",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "chess.js": "^1.4.0",
+    "stockfish": "^18.0.8",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vite": "^8.3.3",
+    "vitest": "^5.0.3"
+  }
+}
