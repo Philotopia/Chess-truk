@@ -75,6 +75,7 @@ export const TRACE_KEY_LABELS: Record<string, string> = {
   backward: 'pion arriéré',
   connected: 'pion connecté',
   advance: 'avancement',
+  pawnFile: 'colonne',
   passed: 'pion passé',
   protectedPassed: 'pion passé protégé',
   kingProximity: 'proximité des rois',
@@ -105,6 +106,7 @@ interface Compiled {
   pstMg: Int32Array; // pièce (0..15) * 128 + case
   pstEg: Int32Array;
   adv: Int32Array; // couleur * 8 + rangée absolue
+  pawnFile: Int32Array; // colonne
   passedMg: Int32Array;
   passedEg: Int32Array;
   on: Uint8Array;
@@ -148,9 +150,11 @@ function compile(p: EvalParams): Compiled {
     passedEg[r] = p.passedPawn.eg[r] | 0;
     passedEg[8 + r] = p.passedPawn.eg[7 - r] | 0;
   }
+  const pawnFile = new Int32Array(8);
+  for (let f = 0; f < 8; f++) pawnFile[f] = (p.pawnFile?.[f] ?? 0) | 0;
   const on = new Uint8Array(NT);
   EVAL_TERMS.forEach((t, i) => (on[i] = p.enabled[t] === false ? 0 : 1));
-  return { value, pstMg, pstEg, adv, passedMg, passedEg, on, p };
+  return { value, pstMg, pstEg, adv, pawnFile, passedMg, passedEg, on, p };
 }
 
 function getCompiled(p: EvalParams): Compiled {
@@ -311,6 +315,8 @@ function run(pos: Position, params: EvalParams): number {
     if (doAdv) {
       const v = C.adv[c * 8 + r];
       if (v || traceAll) add(T_PAWN_ADVANCEMENT, c, v, v, sq, 'advance', rel + 1);
+      const fv = C.pawnFile[f];
+      if (fv || traceAll) add(T_PAWN_ADVANCEMENT, c, fv, fv, sq, 'pawnFile', f);
     }
     // Pion ami devant sur la même colonne ?
     const ownAhead = c === WHITE ? maxRank[c][f] > r : minRank[c][f] < r;

@@ -118,7 +118,26 @@ export function ParamsEditor({ config, onChange }: { config: EngineConfig; onCha
 
       <section className="panel">
         <h3>Pions</h3>
-        <RankTable label="Avancement (tout pion, rangée relative) — règle du projet : jamais réglé automatiquement" values={e.pawnAdvancement} onChange={(v) => set('eval.pawnAdvancement', v)} />
+        <RankTable label="Avancement (tout pion, rangée relative) — règle du projet : croissant avec la rangée" values={e.pawnAdvancement} onChange={(v) => set('eval.pawnAdvancement', v)} />
+        <div className="rank-table">
+          <span>Bonus de colonne (tout pion)</span>
+          <div>
+            {(e.pawnFile ?? new Array(8).fill(0)).map((v, i) => (
+              <label key={i}>
+                <small>{'abcdefgh'[i]}</small>
+                <input
+                  type="number"
+                  value={v}
+                  onChange={(ev) => {
+                    const n = [...(e.pawnFile ?? new Array(8).fill(0))];
+                    n[i] = Number(ev.target.value) || 0;
+                    set('eval.pawnFile', n);
+                  }}
+                />
+              </label>
+            ))}
+          </div>
+        </div>
         <RankTable label="Pion passé — milieu de partie" values={e.passedPawn.mg} onChange={(v) => set('eval.passedPawn.mg', v)} />
         <RankTable label="Pion passé — finale" values={e.passedPawn.eg} onChange={(v) => set('eval.passedPawn.eg', v)} />
         <div className="s2-head">

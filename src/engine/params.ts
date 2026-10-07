@@ -38,7 +38,7 @@ export const EVAL_TERM_LABELS: Record<EvalTerm, string> = {
   psqt: 'Activité / placement (PST)',
   mobility: 'Mobilité',
   pawnStructure: 'Structure de pions',
-  pawnAdvancement: 'Avancement des pions',
+  pawnAdvancement: 'Position des pions (rangée + colonne)',
   passedPawns: 'Pions passés',
   center: 'Contrôle du centre',
   space: 'Espace',
@@ -60,7 +60,8 @@ export const EVAL_TERM_NOTES: Partial<Record<EvalTerm, string>> = {
     'La table des tours ne contient pas de bonus de 7e rangée (compté dans « Tours »). ' +
     'Corrélé avec la mobilité (une pièce centrale a souvent plus de cases).',
   mobility: 'Cases accessibles non occupées par ses propres pièces et non attaquées par un pion adverse, par rapport à une base par pièce.',
-  pawnAdvancement: 'Bonus par rangée pour tout pion, passé ou non. Le bonus « pion passé » s’ajoute séparément.',
+  pawnAdvancement:
+    'Bonus par rangée (avancement) et par colonne pour tout pion, passé ou non. Le bonus « pion passé » et le contrôle du centre s’ajoutent séparément.',
   passedPawns: 'Un pion passé reçoit aussi le bonus d’avancement : les deux sont affichés séparément.',
   center: 'Pions sur d4/e4/d5/e5 et attaques sur ces cases. Les attaques de pièces recoupent partiellement la mobilité.',
   development: 'Corrélé avec la PST (un cavalier en b1 y est déjà pénalisé).',
@@ -79,6 +80,8 @@ export interface EvalParams {
   psqt: Record<PieceKey, Table2>;
   /** Bonus d'avancement par rangée relative (index 0 = 1re rangée, 7 = 8e). */
   pawnAdvancement: number[];
+  /** Bonus de colonne pour tout pion (index 0 = colonne a … 7 = colonne h). */
+  pawnFile: number[];
   /** Bonus pion passé par rangée relative. */
   passedPawn: { mg: number[]; eg: number[] };
   protectedPassed: Score2;
@@ -328,6 +331,7 @@ export function v1EvalParams(): EvalParams {
       king: { mg: [...KING_MG_PST], eg: [...KING_EG_PST] },
     },
     pawnAdvancement: [0, 0, 5, 12, 25, 50, 100, 0],
+    pawnFile: [0, 0, 0, 0, 0, 0, 0, 0],
     passedPawn: { mg: [0, 5, 5, 10, 15, 20, 30, 0], eg: [0, 10, 10, 15, 25, 40, 60, 0] },
     protectedPassed: S(10, 15),
     connectedPawn: S(8, 6),
