@@ -29,6 +29,7 @@ Autres commandes :
 | `npm run texel-gen -- …` | Génère des positions étiquetées par self-play Truk (aucun Stockfish) |
 | `npm run texel-tune -- …` | Réglage Texel des coefficients sous contraintes (écrit une config JSON) |
 | `npm run gen-openings` | Régénère la suite figée de 1000 ouvertures équilibrées |
+| `npm run arena -- …` | Arène des valeurs de pièces : centaines de parties par valeur testée, optimum estimé par ajustement + bootstrap, rapport dans `reports/` |
 | `npm run e2e` | Test de fumée de l’interface dans Chromium (après `npm run build && npm run preview` ; nécessite Playwright et un Chromium) |
 
 Exemples de tournois en ligne de commande :
@@ -163,7 +164,7 @@ répète et produit des parties identiques : l’interface l’indique.
 
 ## Tests
 
-`npm test` exécute 7 fichiers / 90 tests (≈ 2 min) :
+`npm test` exécute 8 fichiers / 93 tests (≈ 2 min) :
 
 - **perft** : 6 positions de référence (initiale, Kiwipete, positions 3–6 et miroir), jusqu’à 4,9 M de nœuds, avec vérification que
   make/unmake restaure le hachage ; `npm run perft` va jusqu’à 194 M de nœuds ;
@@ -179,6 +180,7 @@ répète et produit des parties identiques : l’interface l’indique.
 - **réglage Texel** : la décomposition linéaire reproduit l’évaluation ; la règle des pions est verrouillée (avancement et PST pions non
   réglables, pions passés ≥ 0 et croissants) ;
 - **conversion** : roi + dame / roi + tour contre roi seul sont matés ;
+- **arène** : Elo ± écart-type, ajustement parabolique exact, intervalle bootstrap, courbe monotone détectée ;
 - **match** : livre d’ouvertures légal, statistiques/Elo/IC, analyse des lignes UCI, perte en centipawns, import FEN/EPD/PGN, partie complète
   Truk vs Truk et mini-tournoi **contre Stockfish WASM réel**.
 
@@ -216,6 +218,17 @@ Mesures finales (100 ms/coup, mêmes 60 ouvertures pour chaque ligne ; V1 = code
 
 Lecture : environ +100 Elo contre l’étalon externe Stockfish à profondeur fixe (l’écart en self-play, +319, est comme toujours plus flatteur).
 Contre Stockfish à pleine force, l’écart reste hors de portée de ces techniques.
+
+## Arène des valeurs de pièces
+
+`npm run arena` fait jouer, pour chaque pièce, 4 variantes de valeur (référence ± décalages) contre la configuration de référence,
+300 parties par variante (4800 parties au total + 600 de vérification), avec la règle des pions active partout (pion = 100, avancement
+inchangé). Elo(valeur) est ajusté par une parabole ; le sommet et son intervalle de confiance (bootstrap) estiment la valeur optimale.
+Un test nul (variantes sans effet, dans les deux sièges) vérifie l'absence de biais du dispositif.
+
+Résultat (rapport complet : `reports/arena-muypj4bn77x8pc.md`, données : `.json`) : cavalier 321 [304 – 339], fou 358 [337 – 390],
+tour 518 [494 – 542], dame 1011 [965 – 1094]. Les valeurs V2 (317 / 343 / 521 / 946) sont toutes dans ces intervalles et la combinaison
+des optimums n'apporte rien (−6 ± 24 Elo) : les valeurs actuelles sont conservées, désormais confirmées par l'arène.
 
 ## Premières mesures (V1, CLI, Stockfish 18 lite WASM, 1 thread)
 

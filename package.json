@@ -18,7 +18,8 @@
     "e2e": "node tests/e2e/smoke.cjs",
     "texel-gen": "tsx scripts/texel-gen.ts",
     "texel-tune": "tsx scripts/texel-tune.ts",
-    "gen-openings": "tsx scripts/gen-openings.ts"
+    "gen-openings": "tsx scripts/gen-openings.ts",
+    "arena": "tsx scripts/arena.ts"
   },
   "dependencies": {
     "react": "^19.3.0",
