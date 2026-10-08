@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { eloWithSe, estimateOptimum, fitParabola } from '../src/match/arena';
+import { eloWithSe, estimateOptimum, fitParabola, fitParabolaFree } from '../src/match/arena';
 
 describe('arène des valeurs de pièces', () => {
   it('Elo et écart-type cohérents avec le score', () => {
@@ -27,5 +27,13 @@ describe('arène des valeurs de pièces', () => {
     const m = estimateOptimum(mono, 500);
     expect(m.optimum).toBeNull();
     expect(m.concaveShare).toBeLessThan(0.5);
+  });
+
+  it('parabole libre : retrouve un sommet décalé verticalement', () => {
+    // Elo(d) = −80 − 0,01·(d − 25)² : la référence elle-même perd contre l'adversaire.
+    const pts = [-60, -30, 0, 30, 60].map((d) => ({ offset: d, elo: -80 - 0.01 * (d - 25) ** 2, se: 10 }));
+    const f = fitParabolaFree(pts);
+    expect(f.optimum).toBeCloseTo(25, 6);
+    expect(f.a).toBeCloseTo(-80 - 0.01 * 625, 6);
   });
 });

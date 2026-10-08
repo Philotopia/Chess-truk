@@ -102,3 +102,67 @@ export function estimateOptimum(points: ArenaPoint[], samples = 4000, seed = 123
   const q = (x: number) => opts[Math.min(opts.length - 1, Math.max(0, Math.floor(x * opts.length)))];
   return { ...fit, low: q(0.025), high: q(0.975), concaveShare: concave / samples };
 }
+
+export interface FreeFit {
+  /** Elo(d) ≈ a + b·d + c·d² */
+  a: number;
+  b: number;
+  c: number;
+  optimum: number | null;
+}
+
+/** Moindres carrés pondérés de y = a + b·x + c·x² (référence mesurée comme les autres points). */
+export function fitParabolaFree(points: { offset: number; elo: number; se: number }[]): FreeFit {
+  // Système normal 3×3.
+  const M = [
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0],
+  ];
+  const v = [0, 0, 0];
+  for (const p of points) {
+    const w = 1 / (p.se * p.se);
+    const f = [1, p.offset, p.offset * p.offset];
+    for (let i = 0; i < 3; i++) {
+      v[i] += w * f[i] * p.elo;
+      for (let j = 0; j < 3; j++) M[i][j] += w * f[i] * f[j];
+    }
+  }
+  // Élimination de Gauss.
+  const A = M.map((r, i) => [...r, v[i]]);
+  for (let i = 0; i < 3; i++) {
+    let piv = i;
+    for (let k = i + 1; k < 3; k++) if (Math.abs(A[k][i]) > Math.abs(A[piv][i])) piv = k;
+    [A[i], A[piv]] = [A[piv], A[i]];
+    if (Math.abs(A[i][i]) < 1e-15) return { a: 0, b: 0, c: 0, optimum: null };
+    for (let k = 0; k < 3; k++) {
+      if (k === i) continue;
+      const f = A[k][i] / A[i][i];
+      for (let j = i; j < 4; j++) A[k][j] -= f * A[i][j];
+    }
+  }
+  const a = A[0][3] / A[0][0];
+  const b = A[1][3] / A[1][1];
+  const c = A[2][3] / A[2][2];
+  return { a, b, c, optimum: c < 0 ? -b / (2 * c) : null };
+}
+
+/** Optimum (parabole libre) et intervalle bootstrap. */
+export function estimateOptimumFree(points: ArenaPoint[], samples = 4000, seed = 12345): FreeFit & { low: number; high: number; concaveShare: number } {
+  const fit = fitParabolaFree(points);
+  let s = seed >>> 0;
+  const rand = () => ((s = (Math.imul(s, 1664525) + 1013904223) >>> 0) / 4294967296);
+  const lim = 2 * Math.max(...points.map((p) => Math.abs(p.offset)));
+  const opts: number[] = [];
+  let concave = 0;
+  for (let k = 0; k < samples; k++) {
+    const f = fitParabolaFree(points.map((p) => ({ ...p, elo: p.elo + p.se * gaussian(rand) })));
+    if (f.optimum !== null) {
+      concave++;
+      opts.push(Math.max(-lim, Math.min(lim, f.optimum)));
+    } else opts.push(f.b >= 0 ? lim : -lim);
+  }
+  opts.sort((x, y) => x - y);
+  const q = (x: number) => opts[Math.min(opts.length - 1, Math.max(0, Math.floor(x * opts.length)))];
+  return { ...fit, low: q(0.025), high: q(0.975), concaveShare: concave / samples };
+}
