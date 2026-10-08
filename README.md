@@ -30,6 +30,7 @@ Autres commandes :
 | `npm run texel-tune -- …` | Réglage Texel des coefficients sous contraintes (écrit une config JSON) |
 | `npm run gen-openings` | Régénère la suite figée de 1000 ouvertures équilibrées |
 | `npm run pawn-texel` / `npm run pawn-arena` / `npm run pawn-report` | Valeur des pions selon leur case (rangée et colonne) : estimation statistique, arène de parties, rapport |
+| `npm run sf-arena` / `npm run sf-arena-report` | Arène des valeurs (pièces, pions en 5e–7e) **contre Stockfish** comme adversaire étalon, et son rapport |
 | `npm run arena -- …` | Arène des valeurs de pièces : centaines de parties par valeur testée, optimum estimé par ajustement + bootstrap, rapport dans `reports/` |
 | `npm run e2e` | Test de fumée de l’interface dans Chromium (après `npm run build && npm run preview` ; nécessite Playwright et un Chromium) |
 
@@ -165,7 +166,7 @@ répète et produit des parties identiques : l’interface l’indique.
 
 ## Tests
 
-`npm test` exécute 9 fichiers / 96 tests (≈ 2 min) :
+`npm test` exécute 9 fichiers / 97 tests (≈ 2 min) :
 
 - **perft** : 6 positions de référence (initiale, Kiwipete, positions 3–6 et miroir), jusqu’à 4,9 M de nœuds, avec vérification que
   make/unmake restaure le hachage ; `npm run perft` va jusqu’à 194 M de nœuds ;
@@ -237,6 +238,13 @@ Deux méthodes sans Stockfish (rapport : `reports/pawn-values.md`) : estimation 
 et modèle case par case), puis arène de 10 800 parties (chaque rangée de la 3e à la 7e et chaque paire de colonnes, 4 valeurs × 300 parties),
 et 3 000 parties de vérification. Conclusion : la table d'avancement actuelle (0, 5, 12, 25, 50, 100) est confirmée ; aucune alternative
 ne fait mieux (−3 à −10 ± 19 Elo). La colonne n'a pas d'effet mesurable : le bonus de colonne (`pawnFile`, nouveau paramètre) reste à 0.
+
+## Valeurs mesurées contre Stockfish
+
+`npm run sf-arena` : chaque variante de Truk (4000 nœuds/coup) joue 400 parties contre Stockfish profondeur 5, la référence 800, mêmes
+ouvertures ; 13 000 parties au total (rapport : `reports/sf-arena-muyuob8ae4ehnx.md`). Référence : 36 % contre Stockfish (≈ −100 Elo).
+Optimums : cavalier 324 [292 – 395], tour 532 [488 – 630] ; dame, 6e et 7e rangées peu sensibles ; fou bruité. La combinaison des
+optimums (−20 ± 27 Elo) et la 5e rangée à 12 (+4 ± 27 Elo) ne font pas mieux : les valeurs actuelles sont conservées.
 
 ## Premières mesures (V1, CLI, Stockfish 18 lite WASM, 1 thread)
 

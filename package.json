@@ -23,7 +23,8 @@
     "pawn-texel": "tsx scripts/pawn-texel.ts",
     "pawn-arena": "tsx scripts/pawn-arena.ts",
     "pawn-report": "tsx scripts/pawn-report.ts",
-    "sf-arena": "tsx scripts/sf-arena.ts"
+    "sf-arena": "tsx scripts/sf-arena.ts",
+    "sf-arena-report": "tsx scripts/sf-arena-report.ts"
   },
   "dependencies": {
     "react": "^19.3.0",
