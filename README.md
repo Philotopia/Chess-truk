@@ -29,6 +29,7 @@ Autres commandes :
 | `npm run texel-gen -- …` | Génère des positions étiquetées par self-play Truk (aucun Stockfish) |
 | `npm run texel-tune -- …` | Réglage Texel des coefficients sous contraintes (écrit une config JSON) |
 | `npm run gen-openings` | Régénère la suite figée de 1000 ouvertures équilibrées |
+| `npm run pawn-texel` / `npm run pawn-arena` / `npm run pawn-report` | Valeur des pions selon leur case (rangée et colonne) : estimation statistique, arène de parties, rapport |
 | `npm run arena -- …` | Arène des valeurs de pièces : centaines de parties par valeur testée, optimum estimé par ajustement + bootstrap, rapport dans `reports/` |
 | `npm run e2e` | Test de fumée de l’interface dans Chromium (après `npm run build && npm run preview` ; nécessite Playwright et un Chromium) |
 
@@ -164,7 +165,7 @@ répète et produit des parties identiques : l’interface l’indique.
 
 ## Tests
 
-`npm test` exécute 8 fichiers / 93 tests (≈ 2 min) :
+`npm test` exécute 9 fichiers / 96 tests (≈ 2 min) :
 
 - **perft** : 6 positions de référence (initiale, Kiwipete, positions 3–6 et miroir), jusqu’à 4,9 M de nœuds, avec vérification que
   make/unmake restaure le hachage ; `npm run perft` va jusqu’à 194 M de nœuds ;
@@ -229,6 +230,13 @@ Un test nul (variantes sans effet, dans les deux sièges) vérifie l'absence de 
 Résultat (rapport complet : `reports/arena-muypj4bn77x8pc.md`, données : `.json`) : cavalier 321 [304 – 339], fou 358 [337 – 390],
 tour 518 [494 – 542], dame 1011 [965 – 1094]. Les valeurs V2 (317 / 343 / 521 / 946) sont toutes dans ces intervalles et la combinaison
 des optimums n'apporte rien (−6 ± 24 Elo) : les valeurs actuelles sont conservées, désormais confirmées par l'arène.
+
+## Valeur des pions selon leur case (rangée et colonne)
+
+Deux méthodes sans Stockfish (rapport : `reports/pawn-values.md`) : estimation statistique sur 590 000 positions (modèle « rangée + colonne »
+et modèle case par case), puis arène de 10 800 parties (chaque rangée de la 3e à la 7e et chaque paire de colonnes, 4 valeurs × 300 parties),
+et 3 000 parties de vérification. Conclusion : la table d'avancement actuelle (0, 5, 12, 25, 50, 100) est confirmée ; aucune alternative
+ne fait mieux (−3 à −10 ± 19 Elo). La colonne n'a pas d'effet mesurable : le bonus de colonne (`pawnFile`, nouveau paramètre) reste à 0.
 
 ## Premières mesures (V1, CLI, Stockfish 18 lite WASM, 1 thread)
 

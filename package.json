@@ -21,7 +21,8 @@
     "gen-openings": "tsx scripts/gen-openings.ts",
     "arena": "tsx scripts/arena.ts",
     "pawn-texel": "tsx scripts/pawn-texel.ts",
-    "pawn-arena": "tsx scripts/pawn-arena.ts"
+    "pawn-arena": "tsx scripts/pawn-arena.ts",
+    "pawn-report": "tsx scripts/pawn-report.ts"
   },
   "dependencies": {
     "react": "^19.3.0",
