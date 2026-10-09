@@ -4,3 +4,4 @@ public/stockfish
 *.log
 .DS_Store
 results/
+dist-play
